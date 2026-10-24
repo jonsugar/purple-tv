@@ -13,6 +13,11 @@ interface TokenStore {
 }
 
 class PrefsTokenStore(private val prefs: SharedPreferences) : TokenStore {
+    init {
+        // An earlier build kept the twitch.tv auth-token cookie here; no build reads it now.
+        if (prefs.contains(OLD_SESSION_COOKIE)) prefs.edit().remove(OLD_SESSION_COOKIE).apply()
+    }
+
     override var accessToken: String?
         get() = prefs.getString(ACCESS, null)
         set(value) = put(ACCESS, value)
@@ -35,5 +40,6 @@ class PrefsTokenStore(private val prefs: SharedPreferences) : TokenStore {
         const val ACCESS = "access_token"
         const val REFRESH = "refresh_token"
         const val USER_ID = "user_id"
+        const val OLD_SESSION_COOKIE = "session_auth_token"
     }
 }

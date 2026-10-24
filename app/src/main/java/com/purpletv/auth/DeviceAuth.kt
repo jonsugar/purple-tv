@@ -2,6 +2,8 @@ package com.purpletv.auth
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -32,6 +34,7 @@ class DeviceAuth(
     baseUrl: String = "https://id.twitch.tv/oauth2/",
 ) {
     private val base = baseUrl.toHttpUrl()
+    private val refreshing = Mutex()
 
     val accessToken: String? get() = tokens.accessToken
 
@@ -73,8 +76,14 @@ class DeviceAuth(
         }
     }
 
-    /** Swaps the refresh token for new tokens; false when Twitch no longer accepts it. */
-    suspend fun refresh(): Boolean {
+    /**
+     * Swaps the refresh token for new tokens; false when Twitch no longer accepts it. [failed] is
+     * the access token that got the 401: Twitch takes each refresh token once, so calls that fail
+     * together refresh one at a time, and a call whose token was already replaced uses the new one.
+     */
+    suspend fun refresh(failed: String?): Boolean = refreshing.withLock {
+        val current = tokens.accessToken
+        if (current != null && current != failed) return true
         val refreshToken = tokens.refreshToken ?: return false
         val reply = post("token", FormBody.Builder()
             .add("client_id", clientId)

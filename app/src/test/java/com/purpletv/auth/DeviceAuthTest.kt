@@ -1,5 +1,6 @@
 package com.purpletv.auth
 
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
@@ -16,6 +17,7 @@ import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import java.net.URLDecoder
+import java.util.concurrent.TimeUnit
 
 class DeviceAuthTest {
     private val server = MockWebServer()
@@ -105,7 +107,7 @@ class DeviceAuthTest {
         tokens.refreshToken = "r"
         server.enqueue(MockResponse().setBody("""{"access_token":"a2","refresh_token":"r2"}"""))
 
-        assertTrue(auth.refresh())
+        assertTrue(auth.refresh("a"))
 
         val form = server.takeRequest().form()
         assertEquals("refresh_token", form["grant_type"])
@@ -121,7 +123,26 @@ class DeviceAuthTest {
         tokens.refreshToken = "r"
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"status":400,"message":"Invalid refresh token"}"""))
 
-        assertFalse(auth.refresh())
+        assertFalse(auth.refresh("a"))
+    }
+
+    @Test
+    fun parallel401sRefreshOnce() = runTest {
+        // Twitch takes each refresh token once: a second refresh with r1 would get a 400.
+        tokens.accessToken = "a1"
+        tokens.refreshToken = "r1"
+        server.enqueue(MockResponse().setHeadersDelay(300, TimeUnit.MILLISECONDS)
+            .setBody("""{"access_token":"a2","refresh_token":"r2"}"""))
+        server.enqueue(MockResponse().setResponseCode(400).setBody("""{"status":400,"message":"Invalid refresh token"}"""))
+
+        val first = async { auth.refresh("a1") }
+        val second = async { auth.refresh("a1") }
+
+        assertTrue(first.await())
+        assertTrue(second.await())
+        assertEquals(1, server.requestCount)
+        assertEquals("a2", tokens.accessToken)
+        assertEquals("r2", tokens.refreshToken)
     }
 
     private fun currentTime(scope: TestScope) = scope.currentTime

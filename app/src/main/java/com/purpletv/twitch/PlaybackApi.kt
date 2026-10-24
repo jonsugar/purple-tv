@@ -54,9 +54,10 @@ class PlaybackApi(
     }
 
     private suspend fun requestToken(channel: String): JSONObject {
-        if (auth.accessToken != null) {
-            askForToken(channel, auth.clientId, auth.accessToken)?.let { return it }
-            if (auth.refresh()) askForToken(channel, auth.clientId, auth.accessToken)?.let { return it }
+        val oauth = auth.accessToken
+        if (oauth != null) {
+            askForToken(channel, auth.clientId, oauth)?.let { return it }
+            if (auth.refresh(failed = oauth)) askForToken(channel, auth.clientId, auth.accessToken)?.let { return it }
             // Play without the login rather than not at all; Helix decides whether to sign out.
             Log.i(TAG, "playback token refused, playing signed out")
         }

@@ -51,10 +51,11 @@ class HelixClient(
         val url = base.newBuilder().addPathSegments(path)
             .apply { query.forEach { (k, v) -> addQueryParameter(k, v) } }
             .build()
-        val first = fetch(url)
+        val token = tokens.accessToken ?: throw NotLoggedInException()
+        val first = fetch(url, token)
         if (first.code != 401) return first.requireOk()
-        if (auth.refresh()) {
-            val retry = fetch(url)
+        if (auth.refresh(failed = token)) {
+            val retry = fetch(url, tokens.accessToken ?: throw NotLoggedInException())
             if (retry.code != 401) return retry.requireOk()
         }
         tokens.clearLogin()
@@ -65,8 +66,7 @@ class HelixClient(
         fun requireOk(): String = if (code in 200..299) body else throw IOException("Helix answered HTTP $code")
     }
 
-    private suspend fun fetch(url: HttpUrl): Reply = withContext(Dispatchers.IO) {
-        val token = tokens.accessToken ?: throw NotLoggedInException()
+    private suspend fun fetch(url: HttpUrl, token: String): Reply = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(url)
             .header("Client-Id", auth.clientId)
             .header("Authorization", "Bearer $token")
