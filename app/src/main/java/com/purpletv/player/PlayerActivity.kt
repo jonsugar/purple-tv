@@ -144,6 +144,11 @@ class PlayerActivity : Activity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (qualityMenu.visibility == View.VISIBLE) {
             if (keyCode == KeyEvent.KEYCODE_BACK) { hideQualityMenu(); return true }
+            val row = qualityList.indexOfChild(currentFocus)
+            if (menuKeepsKey(keyCode, row, qualityList.childCount)) {
+                if (row < 0) qualityList.getChildAt(0)?.requestFocus()
+                return true
+            }
             return super.onKeyDown(keyCode, event)
         }
         if (keyCode == KeyEvent.KEYCODE_MENU) { showOverlay(); showQualityMenu(); return true }
