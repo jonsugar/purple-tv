@@ -15,6 +15,7 @@
         app:surface_type="surface_view"
         app:use_controller="false" />
 
+    <include android:id="@+id/chat" layout="@layout/view_chat" />
     <include android:id="@+id/quality_menu" layout="@layout/overlay_quality" />
     <include android:id="@+id/info_overlay" layout="@layout/overlay_info" />
 

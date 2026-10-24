@@ -15,10 +15,16 @@ class PlayerPrefs(private val prefs: SharedPreferences) {
 
     val isAuto get() = maxHeight == AUTO
 
+    /** Whether the chat column opens with the player. */
+    var chatVisible: Boolean
+        get() = prefs.getBoolean(CHAT, false)
+        set(value) = prefs.edit().putBoolean(CHAT, value).apply()
+
     companion object {
         const val AUTO = Int.MAX_VALUE
         private const val DEFAULT_HEIGHT = 1080
         private const val MAX_HEIGHT = "max_height"
         private const val HIGH_FPS = "high_fps"
+        private const val CHAT = "chat_visible"
     }
 }

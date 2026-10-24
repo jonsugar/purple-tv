@@ -34,6 +34,8 @@ import coil.load
 import coil.transform.CircleCropTransformation
 import com.purpletv.PurpleApp
 import com.purpletv.R
+import com.purpletv.chat.ChatClient
+import com.purpletv.chat.ChatView
 import com.purpletv.twitch.Stream
 import com.purpletv.twitch.StreamOfflineException
 import com.purpletv.ui.AvatarCache
@@ -49,8 +51,8 @@ import java.util.Locale
  * Full-screen live player. The video goes through ExoPlayer into a SurfaceView, so the TV's
  * hardware decoder renders it on the video plane instead of the app drawing it with the GPU.
  *
- * The stream info shows when the picture starts and on OK or a free arrow; Down (or Menu) opens
- * the quality menu, Back closes an overlay or the player.
+ * The stream info shows when the picture starts and on OK, Up or Left; Down (or Menu) opens the
+ * quality menu, Right shows or hides the chat, Back closes an overlay or the player.
  * Decoder counters and rebuffer times are logged under "PurpleTV": `logcat -s PurpleTV`.
  */
 @OptIn(UnstableApi::class)
@@ -67,6 +69,8 @@ class PlayerActivity : Activity() {
     private lateinit var qualityMenu: View
     private lateinit var qualityList: LinearLayout
     private lateinit var message: View
+    private lateinit var chatView: ChatView
+    private var chat: ChatClient? = null
 
     private var player: ExoPlayer? = null
     private var trackSelector: DefaultTrackSelector? = null
@@ -86,6 +90,8 @@ class PlayerActivity : Activity() {
         qualityMenu = findViewById(R.id.quality_menu)
         qualityList = findViewById(R.id.quality_list)
         message = findViewById(R.id.player_message)
+        chatView = findViewById(R.id.chat)
+        chatView.bind(login)
         findViewById<ImageView>(R.id.info_avatar).clipToOutline = true
     }
 
@@ -93,11 +99,13 @@ class PlayerActivity : Activity() {
         super.onStart()
         start()
         loadStreamInfo()
+        if (prefs.chatVisible) showChat()
     }
 
     override fun onStop() {
         super.onStop()
         release()
+        hideChat()
     }
 
     override fun onDestroy() {
@@ -113,8 +121,9 @@ class PlayerActivity : Activity() {
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> { toggleInfo(); true }
             KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> { showQualityMenu(); true }
-            // The other arrows have no job yet; showing the info there reveals the key hints.
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> { showInfo(); true }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> { toggleChat(); true }
+            // Up and Left have no job; showing the info there reveals the key hints.
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_LEFT -> { showInfo(); true }
             KeyEvent.KEYCODE_BACK -> if (info.visibility == View.VISIBLE) { hideInfo(); true } else super.onKeyDown(keyCode, event)
             else -> super.onKeyDown(keyCode, event)
         }
@@ -302,6 +311,27 @@ class PlayerActivity : Activity() {
 
     private fun hideQualityMenu() {
         qualityMenu.visibility = View.GONE
+    }
+
+    // --- Chat
+
+    private fun toggleChat() {
+        prefs.chatVisible = chat == null
+        if (prefs.chatVisible) showChat() else hideChat()
+    }
+
+    /** Connects only while the column shows: a hidden chat costs no network or CPU. */
+    private fun showChat() {
+        if (chat != null) return
+        chatView.clear()
+        chatView.visibility = View.VISIBLE
+        chat = ChatClient(app.http, login) { chatView.add(it) }.also { it.connect() }
+    }
+
+    private fun hideChat() {
+        chat?.close()
+        chat = null
+        chatView.visibility = View.GONE
     }
 
     // --- Info overlay

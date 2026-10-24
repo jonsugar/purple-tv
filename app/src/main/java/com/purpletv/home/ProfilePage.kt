@@ -11,7 +11,7 @@ import com.purpletv.R
 import com.purpletv.player.PlayerPrefs
 import com.purpletv.twitch.User
 
-/** Profilo: who is signed in, the default quality, and sign-out. */
+/** Profilo: who is signed in, the default quality, the chat preference, and sign-out. */
 class ProfilePage(
     private val context: Context,
     private val playerPrefs: PlayerPrefs,
@@ -22,11 +22,16 @@ class ProfilePage(
     private val avatar: ImageView = view.findViewById(R.id.profile_avatar)
     private val name: TextView = view.findViewById(R.id.profile_name)
     private val quality: TextView = view.findViewById(R.id.profile_quality_value)
+    private val chat: TextView = view.findViewById(R.id.profile_chat_value)
 
     init {
         avatar.clipToOutline = true
         view.findViewById<View>(R.id.profile_logout).setOnClickListener { onLogout() }
         view.findViewById<View>(R.id.profile_quality).setOnClickListener { nextQuality() }
+        view.findViewById<View>(R.id.profile_chat).setOnClickListener {
+            playerPrefs.chatVisible = !playerPrefs.chatVisible
+            chat.text = chatLabel()
+        }
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName
         view.findViewById<TextView>(R.id.profile_version).text = context.getString(R.string.app_version, version)
     }
@@ -37,7 +42,10 @@ class ProfilePage(
             avatar.load(it) { crossfade(false); transformations(CircleCropTransformation()) }
         }
         quality.text = qualityLabel()
+        chat.text = chatLabel()
     }
+
+    private fun chatLabel() = context.getString(if (playerPrefs.chatVisible) R.string.profile_chat_on else R.string.profile_chat_off)
 
     /** OK walks through the presets: 1080p60, 720p60, 480p, Automatica. */
     private fun nextQuality() {
