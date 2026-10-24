@@ -5,6 +5,7 @@ import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.PrefsTokenStore
 import com.purpletv.auth.TokenStore
 import com.purpletv.net.Http
+import com.purpletv.twitch.HelixClient
 import com.purpletv.twitch.PlaybackApi
 import okhttp3.OkHttpClient
 
@@ -14,6 +15,7 @@ class PurpleApp : Application() {
     lateinit var tokens: TokenStore
     lateinit var playback: PlaybackApi
     lateinit var auth: DeviceAuth
+    lateinit var helix: HelixClient
 
     override fun onCreate() {
         super.onCreate()
@@ -22,6 +24,7 @@ class PurpleApp : Application() {
         tokens = PrefsTokenStore(getSharedPreferences("purpletv", MODE_PRIVATE))
         playback = PlaybackApi(http, tokens)
         auth = DeviceAuth(http, HELIX_CLIENT_ID, tokens)
+        helix = HelixClient(http, tokens, auth)
     }
 
     companion object {
