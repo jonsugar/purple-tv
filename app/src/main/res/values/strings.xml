@@ -11,4 +11,18 @@
     <string name="login_network_error">Connessione non riuscita, riprovo tra poco…</string>
     <string name="login_back_hint">Premi Indietro per uscire</string>
     <string name="login_code_description">Codice di attivazione %1$s</string>
+
+    <string name="nav_home">Home</string>
+    <string name="nav_browse">Sfoglia</string>
+    <string name="nav_search">Cerca</string>
+    <string name="nav_profile">Profilo</string>
+    <string name="coming_soon">In arrivo</string>
+
+    <string name="live">LIVE</string>
+    <string name="viewers">%1$s spettatori</string>
+    <string name="row_followed">Canali seguiti in diretta</string>
+    <string name="row_top">Più visti ora</string>
+    <string name="row_categories">Categorie popolari</string>
+    <string name="followed_empty">Nessun canale seguito è in diretta</string>
+    <string name="row_error">Impossibile caricare. Controlla la connessione.</string>
 </resources>

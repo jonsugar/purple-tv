@@ -1,0 +1,74 @@
+package com.purpletv.ui
+
+import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
+import com.purpletv.twitch.Category
+import com.purpletv.twitch.Stream
+
+sealed interface RowItem {
+    data class StreamItem(val stream: Stream) : RowItem
+    data class CategoryItem(val category: Category) : RowItem
+}
+
+/** Cards in a row (or a grid): streams and categories. Avatars arrive after the list. */
+open class RowAdapter(private val onClick: (RowItem) -> Unit) :
+    ListAdapter<RowItem, RowAdapter.Holder>(Diff) {
+
+    var avatars: Map<String, String> = emptyMap()
+        set(value) {
+            field = value
+            notifyItemRangeChanged(0, itemCount, AVATAR_PAYLOAD)
+        }
+
+    class Holder(val card: android.view.View) : RecyclerView.ViewHolder(card)
+
+    override fun getItemViewType(position: Int) = when (getItem(position)) {
+        is RowItem.StreamItem -> STREAM
+        is RowItem.CategoryItem -> CATEGORY
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+        val card = if (viewType == STREAM) StreamCardView(parent.context) else CategoryCardView(parent.context)
+        card.layoutParams = RecyclerView.LayoutParams(
+            RecyclerView.LayoutParams.WRAP_CONTENT, RecyclerView.LayoutParams.WRAP_CONTENT,
+        ).apply { marginEnd = (CARD_GAP_DP * parent.resources.displayMetrics.density).toInt() }
+        return Holder(card)
+    }
+
+    override fun onBindViewHolder(holder: Holder, position: Int) {
+        val item = getItem(position)
+        when (item) {
+            is RowItem.StreamItem -> (holder.card as StreamCardView).bind(item.stream, avatars[item.stream.userId])
+            is RowItem.CategoryItem -> (holder.card as CategoryCardView).bind(item.category)
+        }
+        holder.card.setOnClickListener { onClick(item) }
+    }
+
+    override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
+        val item = getItem(position)
+        if (payloads.contains(AVATAR_PAYLOAD) && item is RowItem.StreamItem) {
+            (holder.card as StreamCardView).bindAvatar(avatars[item.stream.userId])
+        } else {
+            onBindViewHolder(holder, position)
+        }
+    }
+
+    private object Diff : DiffUtil.ItemCallback<RowItem>() {
+        override fun areItemsTheSame(a: RowItem, b: RowItem) = when {
+            a is RowItem.StreamItem && b is RowItem.StreamItem -> a.stream.userId == b.stream.userId
+            a is RowItem.CategoryItem && b is RowItem.CategoryItem -> a.category.id == b.category.id
+            else -> false
+        }
+
+        override fun areContentsTheSame(a: RowItem, b: RowItem) = a == b
+    }
+
+    private companion object {
+        const val STREAM = 0
+        const val CATEGORY = 1
+        const val CARD_GAP_DP = 8
+        const val AVATAR_PAYLOAD = "avatar"
+    }
+}

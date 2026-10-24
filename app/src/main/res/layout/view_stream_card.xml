@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <LinearLayout
+        android:layout_width="192dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <FrameLayout
+            android:id="@+id/card_ring"
+            android:layout_width="192dp"
+            android:layout_height="112dp"
+            android:padding="4dp">
+
+            <FrameLayout
+                android:id="@+id/card_frame"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/thumb_bg">
+
+                <ImageView
+                    android:id="@+id/card_thumb"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"
+                    android:scaleType="centerCrop" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|start"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/live_badge"
+                    android:paddingHorizontal="3.5dp"
+                    android:paddingVertical="1.5dp"
+                    android:text="@string/live"
+                    android:textColor="#FFFFFF"
+                    android:textFontWeight="700"
+                    android:textSize="7sp" />
+
+                <TextView
+                    android:id="@+id/card_viewers"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/viewer_pill"
+                    android:paddingHorizontal="4dp"
+                    android:paddingVertical="1.5dp"
+                    android:textColor="#FFFFFF"
+                    android:textFontWeight="500"
+                    android:textSize="7.5sp" />
+            </FrameLayout>
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="4dp">
+
+            <ImageView
+                android:id="@+id/card_avatar"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:background="@drawable/avatar_bg"
+                android:importantForAccessibility="no" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="7dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/card_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textFontWeight="600"
+                    android:textSize="9.5sp" />
+
+                <TextView
+                    android:id="@+id/card_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textFontWeight="500"
+                    android:textSize="8.5sp" />
+
+                <TextView
+                    android:id="@+id/card_game"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="8sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</merge>

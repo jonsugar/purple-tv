@@ -16,7 +16,7 @@
         android:theme="@style/Theme.PurpleTV">
 
         <activity
-            android:name=".PlayerActivity"
+            android:name=".home.MainActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize"
             android:exported="true"
             android:launchMode="singleTask">
@@ -26,6 +26,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Exported so tools/install.sh can open a channel directly with its start option. -->
+        <activity
+            android:name=".PlayerActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize"
+            android:exported="true" />
 
         <!-- Exported only so the ADB shell can open it for checks; it shows nothing but a device code. -->
         <activity
