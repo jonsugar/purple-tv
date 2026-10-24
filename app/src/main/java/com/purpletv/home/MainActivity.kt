@@ -3,6 +3,7 @@ package com.purpletv.home
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.widget.FrameLayout
 import com.purpletv.PurpleApp
 import com.purpletv.R
@@ -27,7 +28,7 @@ class MainActivity : Activity() {
     private lateinit var search: SearchPage
     private lateinit var profile: ProfilePage
     private var me: User? = null
-    private var loaded = false
+    private var loadedAtMs = 0L
     private var awaitingLogin = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,8 +49,8 @@ class MainActivity : Activity() {
         home.start()
         when {
             awaitingLogin -> Unit
-            app.tokens.accessToken == null -> login()
-            !loaded -> load()
+            app.tokens.accessToken == null -> { loadedAtMs = 0; login() }
+            homeIsStale(loadedAtMs, SystemClock.elapsedRealtime()) -> load()
         }
     }
 
@@ -68,7 +69,8 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != REQ_LOGIN) return
         awaitingLogin = false
-        if (resultCode == RESULT_OK) { if (!loaded) load() } else finish()
+        // A new login, maybe another account: the rows and the profile load again.
+        if (resultCode == RESULT_OK) load() else finish()
     }
 
     fun showScreen(screen: Screen) {
@@ -89,7 +91,7 @@ class MainActivity : Activity() {
     }
 
     private fun load() {
-        loaded = true
+        loadedAtMs = SystemClock.elapsedRealtime()
         scope.launch {
             try {
                 val user = app.helix.me()
@@ -98,10 +100,10 @@ class MainActivity : Activity() {
                 rail.setAvatar(user.profileImageUrl)
                 home.load(user.id)
             } catch (e: NotLoggedInException) {
-                loaded = false
+                loadedAtMs = 0
                 login()
             } catch (e: IOException) {
-                loaded = false
+                loadedAtMs = 0
                 home.showError()
             }
         }
@@ -110,7 +112,7 @@ class MainActivity : Activity() {
     private fun logout() {
         app.tokens.clearLogin()
         me = null
-        loaded = false
+        loadedAtMs = 0
         showScreen(Screen.HOME)
         login()
     }
