@@ -2,4 +2,13 @@
 <resources>
     <string name="app_name">Purple TV</string>
     <string name="stream_unavailable">%1$s non è disponibile: %2$s</string>
+
+    <string name="login_title">Accedi con il tuo account</string>
+    <string name="login_step_open">1. Sul telefono o sul computer apri %1$s</string>
+    <string name="login_activate_host" translatable="false">twitch.tv/activate</string>
+    <string name="login_step_code">2. Inserisci questo codice e conferma</string>
+    <string name="login_waiting">In attesa della conferma · il codice scade tra %1$s</string>
+    <string name="login_network_error">Connessione non riuscita, riprovo tra poco…</string>
+    <string name="login_back_hint">Premi Indietro per uscire</string>
+    <string name="login_code_description">Codice di attivazione %1$s</string>
 </resources>

@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="purple">#9146FF</color>
+    <color name="purple_light">#BF94FF</color>
     <color name="background">#0E0E10</color>
+    <color name="surface">#18181B</color>
+    <color name="surface_raised">#26262C</color>
+    <color name="border">#2F2F35</color>
+    <color name="live_red">#EB0400</color>
+    <color name="text">#EFEFF1</color>
+    <color name="text_soft">#DEDEE3</color>
+    <color name="text_secondary">#ADADB8</color>
 
     <style name="Theme.PurpleTV" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
         <item name="android:windowBackground">@color/background</item>
         <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowIsFloating">false</item>
         <item name="android:colorAccent">@color/purple</item>
+        <item name="android:textColor">@color/text</item>
     </style>
 </resources>
