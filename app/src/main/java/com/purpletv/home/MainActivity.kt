@@ -3,14 +3,12 @@ package com.purpletv.home
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.view.Gravity
-import android.view.View
 import android.widget.FrameLayout
-import android.widget.TextView
 import com.purpletv.PurpleApp
 import com.purpletv.R
 import com.purpletv.auth.LoginActivity
 import com.purpletv.twitch.NotLoggedInException
+import com.purpletv.twitch.User
 import com.purpletv.ui.AvatarCache
 import com.purpletv.ui.NavRail
 import kotlinx.coroutines.MainScope
@@ -26,6 +24,9 @@ class MainActivity : Activity() {
     private lateinit var rail: NavRail
     private lateinit var home: HomePage
     private lateinit var browse: BrowsePage
+    private lateinit var search: SearchPage
+    private lateinit var profile: ProfilePage
+    private var me: User? = null
     private var loaded = false
     private var awaitingLogin = false
 
@@ -36,6 +37,8 @@ class MainActivity : Activity() {
         val avatars = AvatarCache(app.helix)
         home = HomePage(this, app.helix, avatars)
         browse = BrowsePage(this, scope, app.helix, avatars)
+        search = SearchPage(this, scope, app.helix)
+        profile = ProfilePage(this, app.tokens, ::logout)
         rail = NavRail(findViewById(R.id.nav_rail), ::showScreen)
         showScreen(Screen.HOME)
     }
@@ -74,7 +77,8 @@ class MainActivity : Activity() {
         content.addView(when (screen) {
             Screen.HOME -> home.view
             Screen.BROWSE -> browse.view.also { browse.show() }
-            else -> comingSoon()
+            Screen.SEARCH -> search.view
+            Screen.PROFILE -> profile.view.also { profile.bind(me) }
         })
     }
 
@@ -88,10 +92,11 @@ class MainActivity : Activity() {
         loaded = true
         scope.launch {
             try {
-                val me = app.helix.me()
-                app.tokens.userId = me.id
-                rail.setAvatar(me.profileImageUrl)
-                home.load(me.id)
+                val user = app.helix.me()
+                me = user
+                app.tokens.userId = user.id
+                rail.setAvatar(user.profileImageUrl)
+                home.load(user.id)
             } catch (e: NotLoggedInException) {
                 loaded = false
                 login()
@@ -102,10 +107,12 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun comingSoon(): View = TextView(this).apply {
-        setText(R.string.coming_soon)
-        gravity = Gravity.CENTER
-        setTextColor(getColor(R.color.text_secondary))
+    private fun logout() {
+        app.tokens.clearLogin()
+        me = null
+        loaded = false
+        showScreen(Screen.HOME)
+        login()
     }
 
     private companion object {

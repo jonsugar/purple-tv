@@ -69,6 +69,21 @@ class HelixClientTest {
     }
 
     @Test
+    fun searchChannelsCanAskForLiveOnly() = runTest {
+        server.enqueue(MockResponse().setBody("""{"data":[]}"""))
+        server.enqueue(MockResponse().setBody("""{"data":[]}"""))
+
+        helix.searchChannels("mine")
+        helix.searchChannels("mine", liveOnly = true)
+
+        assertEquals("false", server.takeRequest().requestUrl!!.queryParameter("live_only"))
+        val live = server.takeRequest().requestUrl!!
+        assertEquals("/helix/search/channels", live.encodedPath)
+        assertEquals("mine", live.queryParameter("query"))
+        assertEquals("true", live.queryParameter("live_only"))
+    }
+
+    @Test
     fun refreshesOnceOn401ThenRetries() = runTest {
         server.enqueue(MockResponse().setResponseCode(401))
         server.enqueue(MockResponse().setBody("""{"access_token":"a2","refresh_token":"r2"}"""))

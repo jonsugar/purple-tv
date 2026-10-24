@@ -27,6 +27,13 @@ class NavRail(private val rail: LinearLayout, private val onSelect: (Screen) -> 
 
     init {
         items.forEach { (screen, view) -> view.setOnClickListener { onSelect(screen) } }
+        // Up and Down stay inside the rail: Profilo sits at the bottom, and the nearest view below
+        // Cerca would otherwise be a card on the page.
+        val column = listOf(Screen.HOME, Screen.BROWSE, Screen.SEARCH, Screen.PROFILE).map { items.getValue(it) }
+        column.forEachIndexed { i, view ->
+            view.nextFocusUpId = column[maxOf(i - 1, 0)].id
+            view.nextFocusDownId = column[minOf(i + 1, column.lastIndex)].id
+        }
         rail.viewTreeObserver.addOnGlobalFocusChangeListener { oldFocus, newFocus ->
             val entering = newFocus != null && isInside(newFocus) && (oldFocus == null || !isInside(oldFocus))
             setExpanded(newFocus != null && isInside(newFocus))

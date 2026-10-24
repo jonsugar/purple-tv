@@ -37,8 +37,8 @@ class HelixClient(
     suspend fun topCategories(cursor: String? = null): Page<Category> =
         HelixParser.categories(get("games/top", listOfNotNull("first" to PAGE_SIZE, cursor?.let { "after" to it })))
 
-    suspend fun searchChannels(query: String): List<ChannelResult> =
-        HelixParser.channels(get("search/channels", listOf("query" to query, "live_only" to "false", "first" to "20")))
+    suspend fun searchChannels(query: String, liveOnly: Boolean = false): List<ChannelResult> =
+        HelixParser.channels(get("search/channels", listOf("query" to query, "live_only" to liveOnly.toString(), "first" to "20")))
 
     suspend fun searchCategories(query: String): List<Category> =
         HelixParser.categories(get("search/categories", listOf("query" to query, "first" to "20"))).items

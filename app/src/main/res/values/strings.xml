@@ -16,7 +16,6 @@
     <string name="nav_browse">Sfoglia</string>
     <string name="nav_search">Cerca</string>
     <string name="nav_profile">Profilo</string>
-    <string name="coming_soon">In arrivo</string>
 
     <string name="live">LIVE</string>
     <string name="viewers">%1$s spettatori</string>
@@ -30,4 +29,19 @@
     <string name="tab_live">Canali in diretta</string>
     <string name="category_subtitle">Dirette in corso, dalla più seguita</string>
     <string name="category_empty">Nessuna diretta in questa categoria</string>
+
+    <string name="search_hint">Cerca canali e categorie</string>
+    <string name="row_channels">Canali</string>
+    <string name="row_search_categories">Categorie</string>
+    <string name="offline">Offline</string>
+    <string name="search_no_results">Nessun risultato</string>
+    <string name="channel_offline">%1$s è offline</string>
+
+    <string name="profile_signed_in">Accesso effettuato su questa TV</string>
+    <string name="session_title">Sessione twitch.tv</string>
+    <string name="session_desc">Niente pubblicità sui canali a cui sei abbonato. Si imposta dal computer.</string>
+    <string name="session_active">Attiva</string>
+    <string name="session_missing">Non impostata</string>
+    <string name="logout">Esci dall’account</string>
+    <string name="app_version">Purple TV %1$s · uso personale</string>
 </resources>

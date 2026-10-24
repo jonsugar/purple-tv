@@ -5,14 +5,16 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.purpletv.twitch.Category
+import com.purpletv.twitch.ChannelResult
 import com.purpletv.twitch.Stream
 
 sealed interface RowItem {
     data class StreamItem(val stream: Stream) : RowItem
     data class CategoryItem(val category: Category) : RowItem
+    data class ChannelItem(val channel: ChannelResult) : RowItem
 }
 
-/** Cards in a row (or a grid): streams and categories. Avatars arrive after the list. */
+/** Cards in a row (or a grid): streams, categories and channels. Stream avatars arrive after the list. */
 open class RowAdapter(private val onClick: (RowItem) -> Unit) :
     ListAdapter<RowItem, RowAdapter.Holder>(Diff) {
 
@@ -27,10 +29,15 @@ open class RowAdapter(private val onClick: (RowItem) -> Unit) :
     override fun getItemViewType(position: Int) = when (getItem(position)) {
         is RowItem.StreamItem -> STREAM
         is RowItem.CategoryItem -> CATEGORY
+        is RowItem.ChannelItem -> CHANNEL
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
-        val card = if (viewType == STREAM) StreamCardView(parent.context) else CategoryCardView(parent.context)
+        val card = when (viewType) {
+            STREAM -> StreamCardView(parent.context)
+            CATEGORY -> CategoryCardView(parent.context)
+            else -> ChannelCardView(parent.context)
+        }
         card.layoutParams = RecyclerView.LayoutParams(
             RecyclerView.LayoutParams.WRAP_CONTENT, RecyclerView.LayoutParams.WRAP_CONTENT,
         ).apply { marginEnd = (CARD_GAP_DP * parent.resources.displayMetrics.density).toInt() }
@@ -42,6 +49,7 @@ open class RowAdapter(private val onClick: (RowItem) -> Unit) :
         when (item) {
             is RowItem.StreamItem -> (holder.card as StreamCardView).bind(item.stream, avatars[item.stream.userId])
             is RowItem.CategoryItem -> (holder.card as CategoryCardView).bind(item.category)
+            is RowItem.ChannelItem -> (holder.card as ChannelCardView).bind(item.channel)
         }
         holder.card.setOnClickListener { onClick(item) }
     }
@@ -59,6 +67,7 @@ open class RowAdapter(private val onClick: (RowItem) -> Unit) :
         override fun areItemsTheSame(a: RowItem, b: RowItem) = when {
             a is RowItem.StreamItem && b is RowItem.StreamItem -> a.stream.userId == b.stream.userId
             a is RowItem.CategoryItem && b is RowItem.CategoryItem -> a.category.id == b.category.id
+            a is RowItem.ChannelItem && b is RowItem.ChannelItem -> a.channel.login == b.channel.login
             else -> false
         }
 
@@ -68,6 +77,7 @@ open class RowAdapter(private val onClick: (RowItem) -> Unit) :
     private companion object {
         const val STREAM = 0
         const val CATEGORY = 1
+        const val CHANNEL = 2
         const val CARD_GAP_DP = 8
         const val AVATAR_PAYLOAD = "avatar"
     }

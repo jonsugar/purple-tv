@@ -11,9 +11,9 @@ private const val OPAQUE = 255
  * always attached and only its alpha changes: swapping the background would request a layout,
  * and a horizontal RecyclerView laid out mid-focus scrolls the focused card to its start.
  */
-fun View.focusScale(ring: View, scale: Float = 1.05f) {
+fun View.focusScale(ring: View, scale: Float = 1.05f, ringRes: Int = R.drawable.focus_ring) {
     isFocusable = true
-    ring.setBackgroundResource(R.drawable.focus_ring)
+    ring.setBackgroundResource(ringRes)
     ring.background.mutate().alpha = 0
     setOnFocusChangeListener { v, hasFocus ->
         val target = if (hasFocus) scale else 1f
