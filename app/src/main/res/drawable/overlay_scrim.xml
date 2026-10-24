@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dims the video while the overlay shows and fades to black behind the channel info, which is
+     solid for the bottom 75 dp as in the official TV app. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/overlay_dim" />
+    <item android:gravity="bottom" android:height="215dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="90"
+                android:centerColor="#FF000000"
+                android:centerY="0.35"
+                android:endColor="#00000000"
+                android:startColor="#FF000000" />
+        </shape>
+    </item>
+</layer-list>

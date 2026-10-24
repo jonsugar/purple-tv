@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The official TV app's overlay buttons: translucent grey, white with a purple ring on focus. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFF" />
+            <stroke android:width="2dp" android:color="@color/focus_purple" />
+            <corners android:radius="5dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#33FFFFFF" />
+            <corners android:radius="5dp" />
+        </shape>
+    </item>
+</selector>

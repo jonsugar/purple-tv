@@ -41,17 +41,16 @@
     <string name="logout">Esci dall’account</string>
     <string name="app_version">Purple TV %1$s · uso personale</string>
 
-    <string name="player_hints">OK info · ↓ qualità · → chat · Indietro esci</string>
+    <string name="player_back">Indietro</string>
+    <string name="player_viewers">%1$s spettatori</string>
     <string name="chat_title">Chat</string>
     <string name="profile_chat">Chat nel lettore</string>
-    <string name="profile_chat_desc">Si apre e si chiude anche con → durante la diretta</string>
+    <string name="profile_chat_desc">Si apre e si chiude anche dal pulsante chat nel lettore</string>
     <string name="profile_chat_on">Visibile</string>
     <string name="profile_chat_off">Nascosta</string>
     <string name="player_back_hint">Premi Indietro per tornare</string>
     <string name="player_offline">Il canale è offline</string>
     <string name="player_reconnecting">Connessione persa, riprovo…</string>
-    <string name="player_meta">%1$s spettatori · in diretta da %2$s</string>
-    <string name="player_meta_no_uptime">%1$s spettatori</string>
     <string name="quality_title">Qualità</string>
     <string name="quality_auto">Automatica</string>
     <string name="profile_quality">Qualità predefinita</string>

@@ -5,42 +5,50 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <androidx.media3.ui.PlayerView
-        android:id="@+id/player_view"
+    <!-- Video and overlays; it narrows to make room when the chat column opens. -->
+    <FrameLayout
+        android:id="@+id/player_stage"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:keepScreenOn="true"
-        app:show_buffering="always"
-        app:shutter_background_color="#000000"
-        app:surface_type="surface_view"
-        app:use_controller="false" />
+        android:layout_height="match_parent">
+
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/player_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:keepScreenOn="true"
+            app:show_buffering="always"
+            app:shutter_background_color="#000000"
+            app:surface_type="surface_view"
+            app:use_controller="false" />
+
+        <include android:id="@+id/info_overlay" layout="@layout/overlay_info" />
+        <include android:id="@+id/quality_menu" layout="@layout/overlay_quality" />
+
+        <LinearLayout
+            android:id="@+id/player_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/player_message_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textFontWeight="700"
+                android:textSize="18sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/player_back_hint"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </FrameLayout>
 
     <include android:id="@+id/chat" layout="@layout/view_chat" />
-    <include android:id="@+id/quality_menu" layout="@layout/overlay_quality" />
-    <include android:id="@+id/info_overlay" layout="@layout/overlay_info" />
-
-    <LinearLayout
-        android:id="@+id/player_message"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center_horizontal"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/player_message_title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textFontWeight="700"
-            android:textSize="18sp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/player_back_hint"
-            android:textColor="@color/text_secondary"
-            android:textSize="11sp" />
-    </LinearLayout>
 </FrameLayout>

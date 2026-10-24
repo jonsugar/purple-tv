@@ -17,28 +17,22 @@ import androidx.recyclerview.widget.RecyclerView
 import com.purpletv.R
 
 /**
- * The chat column on the right of the player: newest message at the bottom, the last [LIMIT]
- * kept. Messages are added in batches every [FLUSH_MS] so a busy chat does not redraw per line.
+ * The chat column beside the video, as in the official TV app: newest message at the bottom, the
+ * last [LIMIT] kept. Messages are added in batches every [FLUSH_MS] so a busy chat does not
+ * redraw per line.
  */
 class ChatView(context: Context, attrs: AttributeSet?) : LinearLayout(context, attrs) {
     private val lines = ArrayList<CharSequence>()
     private val pending = ArrayList<ChatMessage>()
     private val adapter = LineAdapter()
     private lateinit var list: RecyclerView
-    private lateinit var channelName: TextView
 
     override fun onFinishInflate() {
         super.onFinishInflate()
-        channelName = findViewById(R.id.chat_channel)
         list = findViewById(R.id.chat_list)
         list.layoutManager = LinearLayoutManager(context).apply { stackFromEnd = true }
         list.adapter = adapter
         list.itemAnimator = null
-    }
-
-    fun bind(channel: String) {
-        channelName.text = channel
-        clear()
     }
 
     fun add(message: ChatMessage) {
@@ -86,7 +80,7 @@ class ChatView(context: Context, attrs: AttributeSet?) : LinearLayout(context, a
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = object : RecyclerView.ViewHolder(TextView(parent.context).apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, TEXT_SP)
-            setTextColor(context.getColor(R.color.text_soft))
+            setTextColor(context.getColor(R.color.text))
             val gap = (LINE_GAP_DP * resources.displayMetrics.density).toInt()
             setPadding(0, gap, 0, gap)
             layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -100,7 +94,7 @@ class ChatView(context: Context, attrs: AttributeSet?) : LinearLayout(context, a
     private companion object {
         const val LIMIT = 150
         const val FLUSH_MS = 200L
-        const val TEXT_SP = 10f
-        const val LINE_GAP_DP = 2
+        const val TEXT_SP = 12f
+        const val LINE_GAP_DP = 4
     }
 }

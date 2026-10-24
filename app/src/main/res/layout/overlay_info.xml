@@ -1,107 +1,128 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- The player overlay, laid out like the official Twitch TV app (its 1080p screen halved into dp). -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="108dp"
-    android:layout_gravity="bottom"
-    android:background="#E60E0E10"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingHorizontal="32dp"
+    android:layout_height="match_parent"
+    android:background="@drawable/overlay_scrim"
     android:visibility="gone">
 
-    <ImageView
-        android:id="@+id/info_avatar"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:background="@drawable/avatar_ring_live"
-        android:importantForAccessibility="no"
-        android:padding="2dp" />
+    <TextView
+        android:id="@+id/overlay_back"
+        android:layout_width="wrap_content"
+        android:layout_height="32dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="36dp"
+        android:layout_marginTop="27dp"
+        android:background="@drawable/overlay_button_bg"
+        android:clickable="true"
+        android:drawableStart="@drawable/ic_back"
+        android:drawablePadding="8dp"
+        android:drawableTint="@color/overlay_content"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="14dp"
+        android:text="@string/player_back"
+        android:textColor="@color/overlay_content"
+        android:textFontWeight="600"
+        android:textSize="12sp" />
 
-    <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="14dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+    <FrameLayout
+        android:layout_width="56dp"
+        android:layout_height="65dp"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="37dp"
+        android:layout_marginBottom="41dp">
 
-        <LinearLayout
+        <ImageView
+            android:id="@+id/info_avatar"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="@drawable/avatar_bg"
+            android:importantForAccessibility="no" />
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_gravity="bottom|center_horizontal"
+            android:background="@drawable/live_badge"
+            android:paddingHorizontal="5dp"
+            android:paddingVertical="1dp"
+            android:text="@string/live"
+            android:textColor="#FFFFFF"
+            android:textFontWeight="700"
+            android:textSize="11sp" />
+    </FrameLayout>
 
-            <TextView
-                android:id="@+id/info_name"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textFontWeight="700"
-                android:textSize="15sp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="112dp"
+        android:layout_marginEnd="250dp"
+        android:layout_marginBottom="55dp"
+        android:orientation="vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/live_badge"
-                android:paddingHorizontal="4dp"
-                android:paddingVertical="1.5dp"
-                android:text="@string/live"
-                android:textColor="#FFFFFF"
-                android:textFontWeight="700"
-                android:textSize="7.5sp" />
-
-            <TextView
-                android:id="@+id/info_meta"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:textColor="@color/text_secondary"
-                android:textSize="10sp" />
-        </LinearLayout>
+        <TextView
+            android:id="@+id/info_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text"
+            android:textFontWeight="600"
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/info_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="1dp"
             android:ellipsize="end"
             android:singleLine="true"
-            android:textFontWeight="500"
-            android:textSize="12sp" />
+            android:textColor="@color/text"
+            android:textFontWeight="700"
+            android:textSize="13sp" />
 
         <TextView
-            android:id="@+id/info_game"
-            android:layout_width="wrap_content"
+            android:id="@+id/info_meta"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textColor="@color/purple_light"
-            android:textFontWeight="600"
-            android:textSize="10sp" />
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp" />
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:gravity="end"
-        android:orientation="vertical">
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="45dp"
+        android:layout_marginBottom="35dp"
+        android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/info_quality"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/quality_chip"
-            android:paddingHorizontal="7dp"
-            android:paddingVertical="3dp"
-            android:textFontWeight="700"
-            android:textSize="10sp" />
+        <ImageView
+            android:id="@+id/overlay_quality"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:background="@drawable/overlay_icon_bg"
+            android:clickable="true"
+            android:contentDescription="@string/quality_title"
+            android:focusable="true"
+            android:scaleType="center"
+            android:src="@drawable/ic_settings"
+            android:tint="@color/overlay_content" />
 
-        <TextView
-            android:id="@+id/info_hints"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="7dp"
-            android:text="@string/player_hints"
-            android:textColor="@color/text_secondary"
-            android:textSize="9sp" />
+        <ImageView
+            android:id="@+id/overlay_chat"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="17dp"
+            android:background="@drawable/overlay_icon_bg"
+            android:clickable="true"
+            android:contentDescription="@string/chat_title"
+            android:focusable="true"
+            android:scaleType="center"
+            android:src="@drawable/ic_chat_panel"
+            android:tint="@color/overlay_content" />
     </LinearLayout>
-</LinearLayout>
+</FrameLayout>

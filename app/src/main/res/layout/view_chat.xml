@@ -1,53 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The official app's chat column: solid, beside the video rather than over it. -->
 <com.purpletv.chat.ChatView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="210dp"
+    android:layout_width="@dimen/chat_width"
     android:layout_height="match_parent"
     android:layout_gravity="end"
-    android:background="#DB0E0E10"
+    android:background="@color/surface"
     android:descendantFocusability="blocksDescendants"
     android:orientation="vertical"
     android:visibility="gone">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="10dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/chat_title"
-            android:textFontWeight="700"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/chat_channel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/text_secondary"
-            android:textSize="10sp" />
-    </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/border" />
-
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/chat_list"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:clipToPadding="false"
         android:focusable="false"
         android:overScrollMode="never"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="6dp"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="8dp"
         android:scrollbars="none" />
 </com.purpletv.chat.ChatView>

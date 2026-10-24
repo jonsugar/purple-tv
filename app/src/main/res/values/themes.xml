@@ -10,6 +10,10 @@
     <color name="text">#EFEFF1</color>
     <color name="text_soft">#DEDEE3</color>
     <color name="text_secondary">#ADADB8</color>
+    <!-- Sampled from the official Twitch TV app's player overlay. -->
+    <color name="focus_purple">#772CE8</color>
+    <color name="overlay_dim">#99000000</color>
+    <color name="viewers_pink">#FF8280</color>
 
     <style name="Theme.PurpleTV" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
         <item name="android:windowBackground">@color/background</item>

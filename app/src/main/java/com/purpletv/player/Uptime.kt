@@ -20,3 +20,7 @@ fun uptime(startedAt: String, nowMs: Long): String {
     val seconds = ((nowMs - start) / 1_000).coerceAtLeast(0)
     return "%d:%02d:%02d".format(seconds / 3600, seconds % 3600 / 60, seconds % 60)
 }
+
+/** The player's info line as the official TV app shows it: "Counter-Strike | 10:49:19 | 32.534 spettatori". */
+fun metaLine(game: String, uptime: String, viewers: String): String =
+    listOf(game, uptime, viewers).filter { it.isNotEmpty() }.joinToString(" | ")

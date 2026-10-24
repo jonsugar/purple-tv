@@ -6,7 +6,9 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
-import android.util.TypedValue
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.view.KeyEvent
 import android.view.View
 import android.widget.ImageView
@@ -51,8 +53,10 @@ import java.util.Locale
  * Full-screen live player. The video goes through ExoPlayer into a SurfaceView, so the TV's
  * hardware decoder renders it on the video plane instead of the app drawing it with the GPU.
  *
- * The stream info shows when the picture starts and on OK, Up or Left; Down (or Menu) opens the
- * quality menu, Right shows or hides the chat, Back closes an overlay or the player.
+ * The overlay follows the official TV app: any key shows it (and it shows once when the picture
+ * starts), with Back, the channel card and buttons for quality and chat; it hides after a few idle
+ * seconds or on Back. Menu opens the quality list directly. The chat column narrows the video
+ * rather than covering it.
  * Decoder counters and rebuffer times are logged under "PurpleTV": `logcat -s PurpleTV`.
  */
 @OptIn(UnstableApi::class)
@@ -65,7 +69,11 @@ class PlayerActivity : Activity() {
 
     private lateinit var login: String
     private lateinit var playerView: PlayerView
-    private lateinit var info: View
+    private lateinit var stage: View
+    private lateinit var overlay: View
+    private lateinit var backButton: View
+    private lateinit var qualityButton: View
+    private lateinit var chatButton: View
     private lateinit var qualityMenu: View
     private lateinit var qualityList: LinearLayout
     private lateinit var message: View
@@ -86,12 +94,25 @@ class PlayerActivity : Activity() {
         setContentView(R.layout.activity_player)
         login = intent.getStringExtra(EXTRA_CHANNEL).orEmpty().trim().lowercase()
         playerView = findViewById(R.id.player_view)
-        info = findViewById(R.id.info_overlay)
+        stage = findViewById(R.id.player_stage)
+        overlay = findViewById(R.id.info_overlay)
+        backButton = findViewById(R.id.overlay_back)
+        qualityButton = findViewById(R.id.overlay_quality)
+        chatButton = findViewById(R.id.overlay_chat)
+        backButton.setOnClickListener { finish() }
+        qualityButton.setOnClickListener { showQualityMenu() }
+        chatButton.setOnClickListener { toggleChat() }
+        // Back sits alone at the top; the two buttons share the bottom row.
+        backButton.nextFocusDownId = R.id.overlay_quality
+        backButton.nextFocusRightId = R.id.overlay_quality
+        qualityButton.nextFocusUpId = R.id.overlay_back
+        qualityButton.nextFocusLeftId = R.id.overlay_back
+        chatButton.nextFocusUpId = R.id.overlay_back
+        chatButton.nextFocusRightId = R.id.overlay_chat
         qualityMenu = findViewById(R.id.quality_menu)
         qualityList = findViewById(R.id.quality_list)
         message = findViewById(R.id.player_message)
         chatView = findViewById(R.id.chat)
-        chatView.bind(login)
         findViewById<ImageView>(R.id.info_avatar).clipToOutline = true
     }
 
@@ -113,20 +134,41 @@ class PlayerActivity : Activity() {
         super.onDestroy()
     }
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Any key while the overlay shows keeps it up a little longer.
+        if (event.action == KeyEvent.ACTION_DOWN && overlay.visibility == View.VISIBLE) scheduleAutoHide()
+        return super.dispatchKeyEvent(event)
+    }
+
+    /** Reached only by keys no button took: focus moves between the buttons on its own. */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (qualityMenu.visibility == View.VISIBLE) {
             if (keyCode == KeyEvent.KEYCODE_BACK) { hideQualityMenu(); return true }
             return super.onKeyDown(keyCode, event)
         }
-        return when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> { toggleInfo(); true }
-            KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_MENU -> { showQualityMenu(); true }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> { toggleChat(); true }
-            // Up and Left have no job; showing the info there reveals the key hints.
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_LEFT -> { showInfo(); true }
-            KeyEvent.KEYCODE_BACK -> if (info.visibility == View.VISIBLE) { hideInfo(); true } else super.onKeyDown(keyCode, event)
-            else -> super.onKeyDown(keyCode, event)
+        if (keyCode == KeyEvent.KEYCODE_MENU) { showOverlay(); showQualityMenu(); return true }
+        if (overlay.visibility == View.VISIBLE) {
+            if (keyCode == KeyEvent.KEYCODE_BACK) { hideOverlay(); return true }
+            // The overlay came up on its own, with nothing focused: the first key only picks a button.
+            if (isNavigationKey(keyCode) && currentFocus?.let { isInside(it, overlay) } != true) {
+                qualityButton.requestFocus()
+                return true
+            }
+            return super.onKeyDown(keyCode, event)
         }
+        if (isNavigationKey(keyCode)) { showOverlay(); return true }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    private fun isNavigationKey(keyCode: Int) = keyCode in NAVIGATION_KEYS
+
+    private fun isInside(view: View, parent: View): Boolean {
+        var v: View? = view
+        while (v != null) {
+            if (v === parent) return true
+            v = v.parent as? View
+        }
+        return false
     }
 
     // --- Playback
@@ -192,7 +234,7 @@ class PlayerActivity : Activity() {
 
     private fun release() {
         ui.removeCallbacks(logStats)
-        ui.removeCallbacks(autoHideInfo)
+        ui.removeCallbacks(autoHide)
         resolving?.cancel()
         playerView.player = null
         player?.release()
@@ -214,8 +256,9 @@ class PlayerActivity : Activity() {
                     bufferingSince = 0
                     attempts = 0
                     message.visibility = View.GONE
-                    // Like the official app: the channel card shows once when the picture starts.
-                    if (!introShown) { introShown = true; showInfo() }
+                    // The overlay shows once when the picture starts, without taking the focus, so a
+                    // first OK cannot press Back by surprise.
+                    if (!introShown) { introShown = true; showOverlay(focus = false) }
                 }
                 Player.STATE_ENDED -> resolve()
             }
@@ -272,13 +315,13 @@ class PlayerActivity : Activity() {
     private fun showQualityMenu() {
         val options = renditions().map { it.option }
         if (options.isEmpty()) return
-        hideInfo()
         qualityList.removeAllViews()
         val current = if (prefs.isAuto) null else pickQuality(options, prefs.maxHeight, prefs.preferHighFrameRate)
         val entries = listOf<QualityOption?>(null) + options
         var focus: View? = null
         entries.forEach { option ->
-            val row = qualityRow(option?.label ?: getString(R.string.quality_auto), selected = option == current)
+            val row = layoutInflater.inflate(R.layout.item_quality, qualityList, false) as TextView
+            row.text = option?.label ?: getString(R.string.quality_auto)
             row.setOnClickListener {
                 if (option == null) {
                     prefs.maxHeight = PlayerPrefs.AUTO
@@ -293,24 +336,17 @@ class PlayerActivity : Activity() {
             if (option == current) focus = row
         }
         qualityMenu.visibility = View.VISIBLE
+        // As in the official app, the current choice is where the focus starts.
         (focus ?: qualityList.getChildAt(0)).requestFocus()
-    }
-
-    private fun qualityRow(label: String, selected: Boolean) = TextView(this).apply {
-        text = label
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-        setTypeface(typeface, if (selected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
-        gravity = android.view.Gravity.CENTER_VERTICAL
-        setPadding(dp(8), 0, dp(8), 0)
-        setBackgroundResource(R.drawable.nav_item_bg)
-        isFocusable = true
-        isClickable = true
-        if (selected) setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_check, 0)
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(30)).apply { bottomMargin = dp(3) }
+        ui.removeCallbacks(autoHide)
     }
 
     private fun hideQualityMenu() {
         qualityMenu.visibility = View.GONE
+        if (overlay.visibility == View.VISIBLE) {
+            qualityButton.requestFocus()
+            scheduleAutoHide()
+        }
     }
 
     // --- Chat
@@ -325,6 +361,7 @@ class PlayerActivity : Activity() {
         if (chat != null) return
         chatView.clear()
         chatView.visibility = View.VISIBLE
+        setStageEnd(resources.getDimensionPixelSize(R.dimen.chat_width))
         chat = ChatClient(app.http, login) { chatView.add(it) }.also { it.connect() }
     }
 
@@ -332,6 +369,14 @@ class PlayerActivity : Activity() {
         chat?.close()
         chat = null
         chatView.visibility = View.GONE
+        setStageEnd(0)
+    }
+
+    private fun setStageEnd(px: Int) {
+        val params = stage.layoutParams as android.widget.FrameLayout.LayoutParams
+        if (params.marginEnd == px) return
+        params.marginEnd = px
+        stage.layoutParams = params
     }
 
     // --- Info overlay
@@ -352,34 +397,38 @@ class PlayerActivity : Activity() {
         val live = stream
         findViewById<TextView>(R.id.info_name).text = live?.displayName ?: login
         findViewById<TextView>(R.id.info_title).text = live?.title.orEmpty()
-        findViewById<TextView>(R.id.info_game).text = live?.gameName.orEmpty()
-        val viewers = live?.let { String.format(Locale.ITALY, "%,d", it.viewers) }
+        val viewers = live?.let { getString(R.string.player_viewers, String.format(Locale.ITALY, "%,d", it.viewers)) }.orEmpty()
         val since = live?.let { uptime(it.startedAt, System.currentTimeMillis()) }.orEmpty()
-        findViewById<TextView>(R.id.info_meta).text = when {
-            viewers == null -> ""
-            since.isEmpty() -> getString(R.string.player_meta_no_uptime, viewers)
-            else -> getString(R.string.player_meta, viewers, since)
+        val line = metaLine(live?.gameName.orEmpty(), since, viewers)
+        // The viewer count closes the line, in the official app's pink.
+        findViewById<TextView>(R.id.info_meta).text = SpannableString(line).apply {
+            if (viewers.isNotEmpty()) {
+                setSpan(ForegroundColorSpan(getColor(R.color.viewers_pink)), line.length - viewers.length, line.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
         }
-        val format = player?.videoFormat
-        findViewById<TextView>(R.id.info_quality).text =
-            format?.let { qualityOptions(listOf(it)).firstOrNull()?.label }.orEmpty()
     }
 
-    private fun toggleInfo() = if (info.visibility == View.VISIBLE) hideInfo() else showInfo()
-
-    private fun showInfo() {
+    private fun showOverlay(focus: Boolean = true) {
         bindInfo()
-        info.visibility = View.VISIBLE
-        ui.removeCallbacks(autoHideInfo)
-        ui.postDelayed(autoHideInfo, INFO_TIMEOUT_MS)
+        overlay.visibility = View.VISIBLE
+        // Focus starts on quality, not Back: a double OK must not leave the channel.
+        if (focus) qualityButton.requestFocus()
+        scheduleAutoHide()
     }
 
-    private fun hideInfo() {
-        info.visibility = View.GONE
-        ui.removeCallbacks(autoHideInfo)
+    private fun hideOverlay() {
+        hideQualityMenu()
+        overlay.visibility = View.GONE
+        currentFocus?.clearFocus()
+        ui.removeCallbacks(autoHide)
     }
 
-    private val autoHideInfo = Runnable { hideInfo() }
+    private fun scheduleAutoHide() {
+        ui.removeCallbacks(autoHide)
+        if (qualityMenu.visibility != View.VISIBLE) ui.postDelayed(autoHide, OVERLAY_TIMEOUT_MS)
+    }
+
+    private val autoHide = Runnable { hideOverlay() }
 
     // --- Diagnostics
 
@@ -419,13 +468,15 @@ class PlayerActivity : Activity() {
         }
     }
 
-    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-
     companion object {
         const val EXTRA_CHANNEL = "channel"
         private const val TAG = "PurpleTV"
         private const val STATS_INTERVAL_MS = 5_000L
-        private const val INFO_TIMEOUT_MS = 5_000L
+        private const val OVERLAY_TIMEOUT_MS = 6_000L
+        private val NAVIGATION_KEYS = setOf(
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+        )
         private const val HIGH_FPS = 50f
         private const val MIN_BUFFER_MS = 15_000
         private const val MAX_BUFFER_MS = 50_000
