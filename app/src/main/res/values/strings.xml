@@ -25,4 +25,9 @@
     <string name="row_categories">Categorie popolari</string>
     <string name="followed_empty">Nessun canale seguito è in diretta</string>
     <string name="row_error">Impossibile caricare. Controlla la connessione.</string>
+
+    <string name="tab_categories">Categorie</string>
+    <string name="tab_live">Canali in diretta</string>
+    <string name="category_subtitle">Dirette in corso, dalla più seguita</string>
+    <string name="category_empty">Nessuna diretta in questa categoria</string>
 </resources>

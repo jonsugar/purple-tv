@@ -1,0 +1,73 @@
+package com.purpletv.category
+
+import android.app.Activity
+import android.os.Bundle
+import android.view.View
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import com.purpletv.PurpleApp
+import com.purpletv.R
+import com.purpletv.twitch.sized
+import com.purpletv.ui.AvatarCache
+import com.purpletv.ui.GridAdapter
+import com.purpletv.ui.Nav
+import com.purpletv.ui.Pager
+import com.purpletv.ui.RowItem
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+
+/** The live streams of one category, most watched first, paged as the grid scrolls. */
+class CategoryActivity : Activity() {
+    private val scope = MainScope()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_category)
+        val helix = PurpleApp.instance.helix
+        val avatars = AvatarCache(helix)
+        val categoryId = intent.getStringExtra(EXTRA_ID).orEmpty()
+        findViewById<TextView>(R.id.category_name).text = intent.getStringExtra(EXTRA_NAME)
+        findViewById<View>(R.id.category_art_frame).clipToOutline = true
+        intent.getStringExtra(EXTRA_ART)?.takeIf { it.isNotEmpty() }?.let {
+            findViewById<ImageView>(R.id.category_art).load(sized(it, ART_W, ART_H)) { crossfade(false) }
+        }
+
+        val grid: RecyclerView = findViewById(R.id.category_grid)
+        val status: TextView = findViewById(R.id.category_status)
+        lateinit var pager: Pager<com.purpletv.twitch.Stream>
+        val adapter = GridAdapter(COLUMNS, { item ->
+            if (item is RowItem.StreamItem) Nav.openStream(this, item.stream.login, item.stream)
+        }) { pager.loadMore() }
+        adapter.attachTo(grid)
+
+        var first = true
+        pager = Pager(scope, key = { it.userId }, fetch = { helix.topStreams(gameId = categoryId, cursor = it) }) { items, failed ->
+            adapter.submitList(items.map { RowItem.StreamItem(it) })
+            status.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+            status.setText(if (failed) R.string.row_error else R.string.category_empty)
+            if (first && items.isNotEmpty()) {
+                first = false
+                grid.post { grid.layoutManager?.findViewByPosition(0)?.requestFocus() }
+            }
+            scope.launch { runCatching { avatars.urls(items.map { it.userId }) }.getOrNull()?.let { adapter.avatars = it } }
+        }
+        pager.loadMore()
+    }
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
+    }
+
+    companion object {
+        const val EXTRA_ID = "category_id"
+        const val EXTRA_NAME = "category_name"
+        const val EXTRA_ART = "category_art"
+        private const val COLUMNS = 4
+        private const val ART_W = 285
+        private const val ART_H = 380
+    }
+}

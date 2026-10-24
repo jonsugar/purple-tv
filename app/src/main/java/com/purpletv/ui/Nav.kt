@@ -3,6 +3,7 @@ package com.purpletv.ui
 import android.content.Context
 import android.content.Intent
 import com.purpletv.PlayerActivity
+import com.purpletv.category.CategoryActivity
 import com.purpletv.twitch.Category
 import com.purpletv.twitch.Stream
 
@@ -13,7 +14,10 @@ object Nav {
             .putExtra(PlayerActivity.EXTRA_CHANNEL, login))
     }
 
-    /** The category screen arrives with the Browse task. */
-    @Suppress("UNUSED_PARAMETER")
-    fun openCategory(context: Context, category: Category) = Unit
+    fun openCategory(context: Context, category: Category) {
+        context.startActivity(Intent(context, CategoryActivity::class.java)
+            .putExtra(CategoryActivity.EXTRA_ID, category.id)
+            .putExtra(CategoryActivity.EXTRA_NAME, category.name)
+            .putExtra(CategoryActivity.EXTRA_ART, category.boxArtTemplate))
+    }
 }

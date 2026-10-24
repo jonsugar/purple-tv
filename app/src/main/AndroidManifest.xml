@@ -33,6 +33,11 @@
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize"
             android:exported="true" />
 
+        <activity
+            android:name=".category.CategoryActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize"
+            android:exported="false" />
+
         <!-- Exported only so the ADB shell can open it for checks; it shows nothing but a device code. -->
         <activity
             android:name=".auth.LoginActivity"

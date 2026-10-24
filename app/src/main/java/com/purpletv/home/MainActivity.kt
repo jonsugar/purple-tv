@@ -25,6 +25,7 @@ class MainActivity : Activity() {
     private lateinit var content: FrameLayout
     private lateinit var rail: NavRail
     private lateinit var home: HomePage
+    private lateinit var browse: BrowsePage
     private var loaded = false
     private var awaitingLogin = false
 
@@ -32,7 +33,9 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         content = findViewById(R.id.content)
-        home = HomePage(this, app.helix, AvatarCache(app.helix))
+        val avatars = AvatarCache(app.helix)
+        home = HomePage(this, app.helix, avatars)
+        browse = BrowsePage(this, scope, app.helix, avatars)
         rail = NavRail(findViewById(R.id.nav_rail), ::showScreen)
         showScreen(Screen.HOME)
     }
@@ -70,6 +73,7 @@ class MainActivity : Activity() {
         content.removeAllViews()
         content.addView(when (screen) {
             Screen.HOME -> home.view
+            Screen.BROWSE -> browse.view.also { browse.show() }
             else -> comingSoon()
         })
     }
