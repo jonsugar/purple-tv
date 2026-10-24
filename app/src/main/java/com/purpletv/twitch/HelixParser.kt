@@ -16,6 +16,7 @@ object HelixParser {
             gameName = it.str("game_name"),
             viewers = it.optInt("viewer_count"),
             thumbnailTemplate = it.str("thumbnail_url"),
+            startedAt = it.str("started_at"),
         )
     }
 

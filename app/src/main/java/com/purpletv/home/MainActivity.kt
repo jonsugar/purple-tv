@@ -38,7 +38,7 @@ class MainActivity : Activity() {
         home = HomePage(this, app.helix, avatars)
         browse = BrowsePage(this, scope, app.helix, avatars)
         search = SearchPage(this, scope, app.helix)
-        profile = ProfilePage(this, app.tokens, ::logout)
+        profile = ProfilePage(this, app.playerPrefs, ::logout)
         rail = NavRail(findViewById(R.id.nav_rail), ::showScreen)
         showScreen(Screen.HOME)
     }

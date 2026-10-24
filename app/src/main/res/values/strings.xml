@@ -38,10 +38,17 @@
     <string name="channel_offline">%1$s è offline</string>
 
     <string name="profile_signed_in">Accesso effettuato su questa TV</string>
-    <string name="session_title">Sessione twitch.tv</string>
-    <string name="session_desc">Niente pubblicità sui canali a cui sei abbonato. Si imposta dal computer.</string>
-    <string name="session_active">Attiva</string>
-    <string name="session_missing">Non impostata</string>
     <string name="logout">Esci dall’account</string>
     <string name="app_version">Purple TV %1$s · uso personale</string>
+
+    <string name="player_hints">OK info · ↓ qualità · Indietro esci</string>
+    <string name="player_back_hint">Premi Indietro per tornare</string>
+    <string name="player_offline">Il canale è offline</string>
+    <string name="player_reconnecting">Connessione persa, riprovo…</string>
+    <string name="player_meta">%1$s spettatori · in diretta da %2$s</string>
+    <string name="player_meta_no_uptime">%1$s spettatori</string>
+    <string name="quality_title">Qualità</string>
+    <string name="quality_auto">Automatica</string>
+    <string name="profile_quality">Qualità predefinita</string>
+    <string name="profile_quality_desc">Usata all’apertura di ogni diretta. OK per cambiarla</string>
 </resources>

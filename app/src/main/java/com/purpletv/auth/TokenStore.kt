@@ -2,14 +2,13 @@ package com.purpletv.auth
 
 import android.content.SharedPreferences
 
-/** The credentials the app keeps. The twitch.tv session token is never logged or shown. */
+/** The credentials the app keeps. Tokens are never logged or shown. */
 interface TokenStore {
     var accessToken: String?
     var refreshToken: String?
     var userId: String?
-    var sessionAuthToken: String?
 
-    /** Forgets the Helix login; the twitch.tv session token stays. */
+    /** Forgets the login. */
     fun clearLogin()
 }
 
@@ -23,9 +22,6 @@ class PrefsTokenStore(private val prefs: SharedPreferences) : TokenStore {
     override var userId: String?
         get() = prefs.getString(USER_ID, null)
         set(value) = put(USER_ID, value)
-    override var sessionAuthToken: String?
-        get() = prefs.getString(SESSION, null)
-        set(value) = put(SESSION, value)
 
     override fun clearLogin() {
         prefs.edit().remove(ACCESS).remove(REFRESH).remove(USER_ID).apply()
@@ -39,6 +35,5 @@ class PrefsTokenStore(private val prefs: SharedPreferences) : TokenStore {
         const val ACCESS = "access_token"
         const val REFRESH = "refresh_token"
         const val USER_ID = "user_id"
-        const val SESSION = "session_auth_token"
     }
 }

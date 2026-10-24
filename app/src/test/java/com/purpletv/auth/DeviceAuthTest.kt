@@ -27,7 +27,7 @@ class DeviceAuthTest {
     @Before
     fun setUp() {
         server.start()
-        auth = DeviceAuth(OkHttpClient(), CLIENT_ID, tokens, server.url("/").toString())
+        auth = DeviceAuth(OkHttpClient(), CLIENT_ID, "user:read:follows", tokens, server.url("/").toString())
     }
 
     @After

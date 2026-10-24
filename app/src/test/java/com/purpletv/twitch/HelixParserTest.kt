@@ -25,6 +25,12 @@ class HelixParserTest {
     }
 
     @Test
+    fun keepsStartTime() {
+        val page = HelixParser.streams("""{"data":[{"user_id":"1","user_login":"pgl","started_at":"2026-10-24T15:00:00Z"}]}""")
+        assertEquals("2026-10-24T15:00:00Z", page.items.single().startedAt)
+    }
+
+    @Test
     fun toleratesMissingFields() {
         val json = """{"data":[{"user_id":"3","user_login":"quiet","user_name":"Quiet","game_id":"",
             "game_name":null,"title":"","viewer_count":0,"thumbnail_url":""}]}"""

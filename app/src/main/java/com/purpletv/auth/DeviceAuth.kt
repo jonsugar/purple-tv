@@ -21,21 +21,24 @@ data class DeviceCode(
 class DeviceCodeExpiredException : IOException("device code expired")
 
 /**
- * Twitch's Device Code Flow for a public Helix app: the TV shows a code, the user
- * confirms it at twitch.tv/activate, and the TV receives the tokens. No client secret exists.
+ * Twitch's Device Code Flow for a public client: the TV shows a code, the user confirms it at
+ * twitch.tv/activate, and the TV receives the tokens into [tokens]. No client secret exists.
  */
 class DeviceAuth(
     private val http: OkHttpClient,
     val clientId: String,
+    private val scopes: String,
     private val tokens: TokenStore,
     baseUrl: String = "https://id.twitch.tv/oauth2/",
 ) {
     private val base = baseUrl.toHttpUrl()
 
+    val accessToken: String? get() = tokens.accessToken
+
     suspend fun start(): DeviceCode {
         val json = post("device", FormBody.Builder()
             .add("client_id", clientId)
-            .add("scopes", SCOPES)
+            .add("scopes", scopes)
             .build()).requireOk()
         return DeviceCode(
             deviceCode = json.getString("device_code"),
@@ -53,7 +56,7 @@ class DeviceAuth(
             delay(intervalSec * 1_000L)
             val reply = post("token", FormBody.Builder()
                 .add("client_id", clientId)
-                .add("scopes", SCOPES)
+                .add("scopes", scopes)
                 .add("device_code", code.deviceCode)
                 .add("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
                 .build())
@@ -102,7 +105,6 @@ class DeviceAuth(
     }
 
     private companion object {
-        const val SCOPES = "user:read:follows"
         const val SLOW_DOWN_SEC = 5
     }
 }

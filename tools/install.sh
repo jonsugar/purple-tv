@@ -30,5 +30,5 @@ case "$OUT" in
 esac
 
 if [ -n "$CHANNEL" ]; then
-  "$PY" -I "$CLEANYOURTV/tools/tv.py" "am start -n com.purpletv/.PlayerActivity --es channel $CHANNEL"
+  "$PY" -I "$CLEANYOURTV/tools/tv.py" "am start -n com.purpletv/.player.PlayerActivity --es channel $CHANNEL"
 fi

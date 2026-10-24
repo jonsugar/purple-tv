@@ -1,7 +1,6 @@
 package com.purpletv.home
 
 import android.content.Context
-import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ImageView
@@ -9,24 +8,25 @@ import android.widget.TextView
 import coil.load
 import coil.transform.CircleCropTransformation
 import com.purpletv.R
-import com.purpletv.auth.TokenStore
+import com.purpletv.player.PlayerPrefs
 import com.purpletv.twitch.User
 
-/** Profilo: who is signed in, whether the ad-free twitch.tv session is set, and sign-out. */
+/** Profilo: who is signed in, the default quality, and sign-out. */
 class ProfilePage(
     private val context: Context,
-    private val tokens: TokenStore,
+    private val playerPrefs: PlayerPrefs,
     private val onLogout: () -> Unit,
 ) {
     val view: View = LayoutInflater.from(context).inflate(R.layout.page_profile, null)
 
     private val avatar: ImageView = view.findViewById(R.id.profile_avatar)
     private val name: TextView = view.findViewById(R.id.profile_name)
-    private val session: TextView = view.findViewById(R.id.profile_session)
+    private val quality: TextView = view.findViewById(R.id.profile_quality_value)
 
     init {
         avatar.clipToOutline = true
         view.findViewById<View>(R.id.profile_logout).setOnClickListener { onLogout() }
+        view.findViewById<View>(R.id.profile_quality).setOnClickListener { nextQuality() }
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName
         view.findViewById<TextView>(R.id.profile_version).text = context.getString(R.string.app_version, version)
     }
@@ -36,22 +36,26 @@ class ProfilePage(
         user?.profileImageUrl?.takeIf { it.isNotEmpty() }?.let {
             avatar.load(it) { crossfade(false); transformations(CircleCropTransformation()) }
         }
-        // Only whether the token exists is shown, never the token.
-        val active = tokens.sessionAuthToken != null
-        session.setText(if (active) R.string.session_active else R.string.session_missing)
-        session.setCompoundDrawablesRelativeWithIntrinsicBounds(dot(if (active) ACTIVE_GREEN else INACTIVE_GREY), null, null, null)
+        quality.text = qualityLabel()
     }
 
-    private fun dot(color: Int) = GradientDrawable().apply {
-        shape = GradientDrawable.OVAL
-        setColor(color)
-        val size = (DOT_DP * context.resources.displayMetrics.density).toInt()
-        setSize(size, size)
+    /** OK walks through the presets: 1080p60, 720p60, 480p, Automatica. */
+    private fun nextQuality() {
+        val current = PRESETS.indexOfFirst { it.first == playerPrefs.maxHeight && it.second == playerPrefs.preferHighFrameRate }
+        val (height, highFps) = PRESETS[(current + 1) % PRESETS.size]
+        playerPrefs.maxHeight = height
+        playerPrefs.preferHighFrameRate = highFps
+        quality.text = qualityLabel()
+    }
+
+    private fun qualityLabel(): String = when {
+        playerPrefs.isAuto -> context.getString(R.string.quality_auto)
+        playerPrefs.preferHighFrameRate && playerPrefs.maxHeight >= HD -> "${playerPrefs.maxHeight}p60"
+        else -> "${playerPrefs.maxHeight}p"
     }
 
     private companion object {
-        const val DOT_DP = 6
-        const val ACTIVE_GREEN = 0xFF00C853.toInt()
-        const val INACTIVE_GREY = 0xFF6B6B73.toInt()
+        val PRESETS = listOf(1080 to true, 720 to true, 480 to false, PlayerPrefs.AUTO to true)
+        const val HD = 720
     }
 }

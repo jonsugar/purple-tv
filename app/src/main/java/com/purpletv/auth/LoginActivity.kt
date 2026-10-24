@@ -7,6 +7,7 @@ import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
+import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.widget.LinearLayout
@@ -57,6 +58,8 @@ class LoginActivity : Activity() {
             } catch (e: DeviceCodeExpiredException) {
                 // Next round asks for a fresh code.
             } catch (e: IOException) {
+                // The message carries only the HTTP status, never a token.
+                Log.w(TAG, "device login (${auth.clientId.take(4)}…): ${e.message}")
                 countdown?.cancel()
                 status.setText(R.string.login_network_error)
                 delay(RETRY_MS)
@@ -101,5 +104,6 @@ class LoginActivity : Activity() {
 
     private companion object {
         const val RETRY_MS = 5_000L
+        const val TAG = "PurpleTV"
     }
 }

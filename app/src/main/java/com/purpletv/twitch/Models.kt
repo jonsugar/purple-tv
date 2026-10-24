@@ -9,6 +9,8 @@ data class Stream(
     val gameName: String,
     val viewers: Int,
     val thumbnailTemplate: String,
+    /** ISO-8601 UTC, "" when Helix leaves it out. */
+    val startedAt: String = "",
 )
 
 data class Category(val id: String, val name: String, val boxArtTemplate: String)

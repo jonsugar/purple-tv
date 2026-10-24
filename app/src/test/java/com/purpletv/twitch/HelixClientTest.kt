@@ -27,7 +27,7 @@ class HelixClientTest {
         tokens.accessToken = "a"
         tokens.refreshToken = "r"
         val http = OkHttpClient()
-        val auth = DeviceAuth(http, CLIENT_ID, tokens, server.url("/oauth2/").toString())
+        val auth = DeviceAuth(http, CLIENT_ID, "user:read:follows", tokens, server.url("/oauth2/").toString())
         helix = HelixClient(http, tokens, auth, server.url("/helix/").toString())
     }
 
@@ -81,6 +81,21 @@ class HelixClientTest {
         assertEquals("/helix/search/channels", live.encodedPath)
         assertEquals("mine", live.queryParameter("query"))
         assertEquals("true", live.queryParameter("live_only"))
+    }
+
+    @Test
+    fun streamByLoginAsksForThatChannel() = runTest {
+        server.enqueue(MockResponse().setBody(oneStream))
+        server.enqueue(MockResponse().setBody("""{"data":[]}"""))
+
+        val live = helix.streamByLogin("PGL")
+        val offline = helix.streamByLogin("nobody")
+
+        val url = server.takeRequest().requestUrl!!
+        assertEquals("/helix/streams", url.encodedPath)
+        assertEquals("pgl", url.queryParameter("user_login"))
+        assertEquals("pgl", live?.login)
+        assertNull(offline)
     }
 
     @Test

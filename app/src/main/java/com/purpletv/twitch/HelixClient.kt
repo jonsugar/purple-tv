@@ -30,6 +30,10 @@ class HelixClient(
     suspend fun followedStreams(userId: String): List<Stream> =
         HelixParser.streams(get("streams/followed", listOf("user_id" to userId, "first" to "100"))).items
 
+    /** The live stream of one channel, or null when it is offline. */
+    suspend fun streamByLogin(login: String): Stream? =
+        HelixParser.streams(get("streams", listOf("user_login" to login.trim().lowercase()))).items.firstOrNull()
+
     suspend fun topStreams(gameId: String? = null, cursor: String? = null): Page<Stream> =
         HelixParser.streams(get("streams", listOfNotNull(
             "first" to PAGE_SIZE, gameId?.let { "game_id" to it }, cursor?.let { "after" to it })))
