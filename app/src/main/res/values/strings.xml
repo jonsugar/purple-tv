@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Purple TV</string>
+    <string name="stream_unavailable">%1$s non è disponibile: %2$s</string>
+</resources>
