@@ -107,17 +107,19 @@ class HomePage(
         adapter.submit(listOf(HomeRow(context.getString(R.string.row_followed), RowKind.STREAMS, Result.failure(RuntimeException()))))
     }
 
-    /** Whether Home is at its start: the rows scrolled all the way up and the first card focused last. */
-    fun isAtTop(): Boolean = !rows.canScrollVertically(-1) && onFirstCard
+    /** Whether Home is at its start: the first card of its top row focused last. */
+    fun isAtTop(): Boolean = homeAtTop(topRow(adapter.rows), focusedRow, onFirstCard)
 
+    /** Brings the top row to the start, where focusing it puts it anyway. */
     fun scrollToTop() {
-        rows.scrollToPosition(0)
-        focusedRow = -1
+        val top = topRow(adapter.rows).coerceAtLeast(0)
+        rowsLayout.scrollToPositionWithOffset(top, 0)
+        focusedRow = top
     }
 
-    /** Focuses the first card of the first row that has cards. */
+    /** Focuses the first card of the top row. */
     fun focusFirst() {
-        val index = adapter.rows.indexOfFirst { row -> row.items.getOrNull().orEmpty().any { it !is RowItem.Skeleton } }
+        val index = topRow(adapter.rows)
         if (index >= 0) adapter.focusFirstCard(index)
     }
 
