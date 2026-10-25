@@ -4,16 +4,24 @@ import android.content.Context
 import android.content.Intent
 import com.purpletv.category.CategoryActivity
 import com.purpletv.player.PlayerActivity
+import com.purpletv.player.toTuneInfo
 import com.purpletv.twitch.Category
 import com.purpletv.twitch.Stream
 
 /** Where cards lead. */
 object Nav {
-    /** The player fetches the stream's details itself; [stream] is accepted for callers that have one. */
-    @Suppress("UNUSED_PARAMETER")
-    fun openStream(context: Context, login: String, stream: Stream? = null) {
-        context.startActivity(Intent(context, PlayerActivity::class.java)
-            .putExtra(PlayerActivity.EXTRA_CHANNEL, login))
+    /** With the card's [stream] (and [avatar]), the player shows them while the video loads. */
+    fun openStream(context: Context, login: String, stream: Stream? = null, avatar: String? = null) {
+        val intent = Intent(context, PlayerActivity::class.java).putExtra(PlayerActivity.EXTRA_CHANNEL, login)
+        stream?.toTuneInfo(avatar)?.let { tune ->
+            intent.putExtra(PlayerActivity.EXTRA_NAME, tune.name)
+                .putExtra(PlayerActivity.EXTRA_TITLE, tune.title)
+                .putExtra(PlayerActivity.EXTRA_GAME, tune.game)
+                .putExtra(PlayerActivity.EXTRA_VIEWERS, tune.viewers)
+                .putExtra(PlayerActivity.EXTRA_THUMB, tune.thumbnail)
+                .putExtra(PlayerActivity.EXTRA_AVATAR, tune.avatar)
+        }
+        context.startActivity(intent)
     }
 
     fun openCategory(context: Context, category: Category) {

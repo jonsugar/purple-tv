@@ -60,6 +60,7 @@
     <string name="player_back_hint">Premi Indietro per tornare</string>
     <string name="player_offline">Il canale è offline</string>
     <string name="player_reconnecting">Connessione persa, riprovo…</string>
+    <string name="tune_label">Sintonizzazione</string>
     <string name="quality_title">Qualità</string>
     <string name="quality_auto">Automatica</string>
     <string name="profile_quality">Qualità predefinita</string>

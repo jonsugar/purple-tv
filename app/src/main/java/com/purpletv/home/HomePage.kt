@@ -136,12 +136,14 @@ class HomePage(
 
     private fun open(item: RowItem) {
         when (item) {
-            is RowItem.StreamItem -> Nav.openStream(context, item.stream.login, item.stream)
+            is RowItem.StreamItem -> Nav.openStream(context, item.stream.login, item.stream, avatarOf(item.stream.userId))
             is RowItem.CategoryItem -> Nav.openCategory(context, item.category)
             is RowItem.ChannelItem -> Nav.openStream(context, item.channel.login)
             RowItem.Skeleton -> Unit
         }
     }
+
+    private fun avatarOf(userId: String): String? = adapter.rows.firstNotNullOfOrNull { it.avatars[userId] }
 
     private fun skeletonRows(): List<HomeRow> = listOf(
         HomeRow(context.getString(R.string.row_followed), RowKind.STREAMS, Result.success(List(SKELETON_CARDS) { RowItem.Skeleton })),
@@ -246,8 +248,6 @@ class HomePage(
                 })
             }
         }
-
-        private fun avatarOf(userId: String): String? = adapter.rows.firstNotNullOfOrNull { it.avatars[userId] }
     }
 
     private companion object {

@@ -77,6 +77,7 @@ class PlayerActivity : Activity() {
     private lateinit var qualityMenu: View
     private lateinit var qualityList: LinearLayout
     private lateinit var message: View
+    private lateinit var tune: View
     private lateinit var chatView: ChatView
     private var chat: ChatClient? = null
 
@@ -88,6 +89,7 @@ class PlayerActivity : Activity() {
     private var bufferingSince = 0L
     private var stream: Stream? = null
     private var introShown = false
+    private var layer = PlayerLayer.TUNING
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -114,6 +116,8 @@ class PlayerActivity : Activity() {
         message = findViewById(R.id.player_message)
         chatView = findViewById(R.id.chat)
         findViewById<ImageView>(R.id.info_avatar).clipToOutline = true
+        tune = findViewById(R.id.tune_layer)
+        bindTune(tuneFromIntent())
     }
 
     override fun onStart() {
@@ -196,6 +200,7 @@ class PlayerActivity : Activity() {
         qualityApplied = false
         introShown = false
         attempts = 0
+        on(PlayerEvent.Started)
         resolve()
         ui.postDelayed(logStats, STATS_INTERVAL_MS)
     }
@@ -223,6 +228,7 @@ class PlayerActivity : Activity() {
                 message.visibility = View.GONE
                 Log.i(TAG, "playing $login")
             } catch (e: StreamOfflineException) {
+                on(PlayerEvent.Offline)
                 showMessage(R.string.player_offline)
             } catch (e: IOException) {
                 Log.w(TAG, "cannot resolve $login: ${e.message}")
@@ -232,6 +238,7 @@ class PlayerActivity : Activity() {
     }
 
     private fun retryLater() {
+        on(PlayerEvent.ConnectionLost)
         showMessage(R.string.player_reconnecting)
         val wait = retry.delayFor(attempts++)
         resolving = scope.launch { delay(wait); resolve() }
@@ -245,6 +252,42 @@ class PlayerActivity : Activity() {
         player?.release()
         player = null
         trackSelector = null
+    }
+
+    // --- Tune-in
+
+    private fun tuneFromIntent() = TuneInfo(
+        login = login,
+        name = intent.getStringExtra(EXTRA_NAME) ?: login,
+        title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
+        game = intent.getStringExtra(EXTRA_GAME).orEmpty(),
+        viewers = intent.getIntExtra(EXTRA_VIEWERS, 0),
+        thumbnail = intent.getStringExtra(EXTRA_THUMB).orEmpty(),
+        avatar = intent.getStringExtra(EXTRA_AVATAR),
+    )
+
+    private fun bindTune(info: TuneInfo) {
+        val thumb = findViewById<ImageView>(R.id.tune_thumb)
+        if (info.thumbnail.isEmpty()) thumb.setImageDrawable(null) else thumb.load(info.thumbnail)
+        val avatar = findViewById<ImageView>(R.id.tune_avatar)
+        if (info.avatar.isNullOrEmpty()) avatar.setImageDrawable(null)
+        else avatar.load(info.avatar) { transformations(CircleCropTransformation()) }
+        findViewById<TextView>(R.id.tune_name).text = info.name
+        findViewById<TextView>(R.id.tune_title).text = info.title
+        findViewById<TextView>(R.id.tune_meta).text = metaText(info.game, "", info.viewers.takeIf { it > 0 })
+    }
+
+    /** Moves between the tune-in, the video and the messages; see [nextLayer]. */
+    private fun on(event: PlayerEvent) {
+        val next = nextLayer(layer, event)
+        if (next == layer && event != PlayerEvent.Started) return
+        layer = next
+        tune.animate().cancel()
+        when (next) {
+            PlayerLayer.TUNING -> { tune.alpha = 1f; tune.visibility = View.VISIBLE }
+            PlayerLayer.VIDEO -> tune.animate().alpha(0f).setDuration(TUNE_FADE_MS).withEndAction { tune.visibility = View.GONE }.start()
+            PlayerLayer.RECONNECTING, PlayerLayer.OFFLINE -> tune.visibility = View.GONE
+        }
     }
 
     private fun showMessage(text: Int) {
@@ -268,6 +311,8 @@ class PlayerActivity : Activity() {
                 Player.STATE_ENDED -> resolve()
             }
         }
+
+        override fun onRenderedFirstFrame() = on(PlayerEvent.FirstFrame)
 
         override fun onTracksChanged(tracks: Tracks) {
             if (!qualityApplied && renditions().isNotEmpty()) {
@@ -402,11 +447,15 @@ class PlayerActivity : Activity() {
         val live = stream
         findViewById<TextView>(R.id.info_name).text = live?.displayName ?: login
         findViewById<TextView>(R.id.info_title).text = live?.title.orEmpty()
-        val viewers = live?.let { getString(R.string.player_viewers, String.format(Locale.ITALY, "%,d", it.viewers)) }.orEmpty()
         val since = live?.let { uptime(it.startedAt, System.currentTimeMillis()) }.orEmpty()
-        val line = metaLine(live?.gameName.orEmpty(), since, viewers)
-        // The viewer count closes the line, in the official app's pink.
-        findViewById<TextView>(R.id.info_meta).text = SpannableString(line).apply {
+        findViewById<TextView>(R.id.info_meta).text = metaText(live?.gameName.orEmpty(), since, live?.viewers)
+    }
+
+    /** Game · uptime · viewers; the viewer count closes the line, in the official app's pink. */
+    private fun metaText(game: String, since: String, viewerCount: Int?): CharSequence {
+        val viewers = viewerCount?.let { getString(R.string.player_viewers, String.format(Locale.ITALY, "%,d", it)) }.orEmpty()
+        val line = metaLine(game, since, viewers)
+        return SpannableString(line).apply {
             if (viewers.isNotEmpty()) {
                 setSpan(ForegroundColorSpan(getColor(R.color.viewers_pink)), line.length - viewers.length, line.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
@@ -475,6 +524,13 @@ class PlayerActivity : Activity() {
 
     companion object {
         const val EXTRA_CHANNEL = "channel"
+        const val EXTRA_NAME = "tune_name"
+        const val EXTRA_TITLE = "tune_title"
+        const val EXTRA_GAME = "tune_game"
+        const val EXTRA_VIEWERS = "tune_viewers"
+        const val EXTRA_THUMB = "tune_thumb"
+        const val EXTRA_AVATAR = "tune_avatar"
+        private const val TUNE_FADE_MS = 200L
         private const val TAG = "PurpleTV"
         private const val STATS_INTERVAL_MS = 5_000L
         private const val OVERLAY_TIMEOUT_MS = 6_000L

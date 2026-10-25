@@ -55,8 +55,9 @@ class CategoryActivity : Activity() {
         val grid: RecyclerView = findViewById(R.id.category_grid)
         val status: TextView = findViewById(R.id.category_status)
         lateinit var pager: Pager<com.purpletv.twitch.Stream>
-        val adapter = GridAdapter(COLUMNS, { item ->
-            if (item is RowItem.StreamItem) Nav.openStream(this, item.stream.login, item.stream)
+        lateinit var adapter: GridAdapter
+        adapter = GridAdapter(COLUMNS, { item ->
+            if (item is RowItem.StreamItem) Nav.openStream(this, item.stream.login, item.stream, adapter.avatars[item.stream.userId])
         }) { pager.loadMore() }
         adapter.attachTo(grid)
 

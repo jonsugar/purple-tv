@@ -21,6 +21,7 @@
             app:surface_type="surface_view"
             app:use_controller="false" />
 
+        <include layout="@layout/overlay_tune" />
         <include android:id="@+id/info_overlay" layout="@layout/overlay_info" />
         <include android:id="@+id/quality_menu" layout="@layout/overlay_quality" />
 
