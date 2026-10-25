@@ -39,6 +39,12 @@ class ChatClientTest {
             override fun onMessage(webSocket: WebSocket, text: String) {
                 text.split("\r\n").filter { it.isNotEmpty() }.forEach(received::add)
             }
+
+            // Twitch answers the client's close. Without the answer the mock connection stays
+            // open and server.shutdown() gives up whenever the close frame lands before it.
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                webSocket.close(code, null)
+            }
         }))
         server.start()
         val messages = LinkedBlockingQueue<ChatMessage>()

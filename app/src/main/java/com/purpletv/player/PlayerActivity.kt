@@ -187,7 +187,9 @@ class PlayerActivity : Activity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (zapStrip.visibility == View.VISIBLE) {
             if (keyCode == KeyEvent.KEYCODE_BACK) { hideZapStrip(); return true }
-            if (zapPanelKeepsKey(keyCode)) return true
+            val list = findViewById<RecyclerView>(R.id.zap_list)
+            val index = currentFocus?.let { list.findContainingViewHolder(it) }?.bindingAdapterPosition ?: -1
+            if (zapPanelKeepsKey(keyCode, index, zap.streams.size)) return true
             return super.onKeyDown(keyCode, event)
         }
         if (qualityMenu.visibility == View.VISIBLE) {

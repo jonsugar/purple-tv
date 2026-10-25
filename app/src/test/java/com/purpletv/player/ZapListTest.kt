@@ -27,9 +27,27 @@ class ZapListTest {
 
     @Test
     fun upAndDownStayInTheStrip() {
-        assertTrue(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_UP))
-        assertTrue(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_DOWN))
-        assertFalse(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_LEFT))
-        assertFalse(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_CENTER))
+        assertTrue(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_UP, index = 1, count = 3))
+        assertTrue(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_DOWN, index = 1, count = 3))
+        assertFalse(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_CENTER, index = 1, count = 3))
+    }
+
+    @Test
+    fun leftStopsAtTheFirstChannel() {
+        // Left from the first card used to land on Back, one OK away from leaving the player.
+        assertTrue(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_LEFT, index = 0, count = 3))
+        assertFalse(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_LEFT, index = 1, count = 3))
+    }
+
+    @Test
+    fun rightStopsAtTheLastChannel() {
+        assertTrue(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_RIGHT, index = 2, count = 3))
+        assertFalse(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_RIGHT, index = 1, count = 3))
+    }
+
+    @Test
+    fun sideArrowsWithTheFocusOutsideTheStripAreKept() {
+        assertTrue(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_LEFT, index = -1, count = 3))
+        assertTrue(zapPanelKeepsKey(KeyEvent.KEYCODE_DPAD_RIGHT, index = -1, count = 3))
     }
 }
