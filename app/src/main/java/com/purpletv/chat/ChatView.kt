@@ -1,7 +1,6 @@
 package com.purpletv.chat
 
 import android.content.Context
-import android.graphics.Color
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
@@ -66,7 +65,8 @@ class ChatView(context: Context, attrs: AttributeSet?) : LinearLayout(context, a
     }
 
     private fun line(message: ChatMessage): CharSequence {
-        val color = message.color?.let { runCatching { Color.parseColor(it) }.getOrNull() } ?: context.getColor(R.color.purple_light)
+        // Twitch names keep their own colour, lightened where it would be too dark on the panel.
+        val color = readableNameColor(message.color)
         return SpannableStringBuilder().apply {
             append(message.user, ForegroundColorSpan(color), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             setSpan(StyleSpan(Typeface.BOLD), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)

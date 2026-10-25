@@ -9,17 +9,12 @@
     android:paddingHorizontal="12dp"
     android:paddingVertical="20dp">
 
-    <TextView
+    <ImageView
         android:layout_width="28dp"
         android:layout_height="28dp"
         android:layout_marginBottom="16dp"
-        android:background="@drawable/badge"
-        android:gravity="center"
         android:importantForAccessibility="no"
-        android:text="P"
-        android:textColor="#FFFFFF"
-        android:textFontWeight="800"
-        android:textSize="14sp" />
+        android:src="@drawable/app_icon" />
 
     <include android:id="@+id/nav_home" layout="@layout/view_nav_item" />
     <include android:id="@+id/nav_browse" layout="@layout/view_nav_item" />

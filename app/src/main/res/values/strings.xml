@@ -9,7 +9,7 @@
     <string name="login_step_code">2. Inserisci questo codice e conferma</string>
     <string name="login_waiting">In attesa della conferma · il codice scade tra %1$s</string>
     <string name="login_network_error">Connessione non riuscita, riprovo tra poco…</string>
-    <string name="login_back_hint">Premi Indietro per uscire</string>
+    <string name="login_qr">Oppure inquadra il codice con il telefono</string>
     <string name="login_code_description">Codice di attivazione %1$s</string>
 
     <string name="nav_home">Home</string>

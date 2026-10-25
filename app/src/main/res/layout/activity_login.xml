@@ -13,16 +13,11 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <TextView
+        <ImageView
             android:layout_width="28dp"
             android:layout_height="28dp"
-            android:background="@drawable/badge"
-            android:gravity="center"
-            android:text="P"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:importantForAccessibility="no" />
+            android:importantForAccessibility="no"
+            android:src="@drawable/app_icon" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -38,6 +33,12 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
         android:orientation="vertical">
 
         <TextView
@@ -92,10 +93,39 @@
         </LinearLayout>
     </LinearLayout>
 
-    <TextView
+    <!-- The activation link as a QR code, for a phone camera: it opens with the code filled in. -->
+    <LinearLayout
+        android:id="@+id/login_qr_box"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/login_back_hint"
-        android:textColor="@color/text_secondary"
-        android:textSize="10sp" />
+        android:layout_marginStart="48dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:visibility="invisible">
+
+        <FrameLayout
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:background="@drawable/qr_bg"
+            android:padding="8dp">
+
+            <ImageView
+                android:id="@+id/login_qr"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:importantForAccessibility="no"
+                android:scaleType="fitXY" />
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center_horizontal"
+            android:maxWidth="170dp"
+            android:text="@string/login_qr"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+    </LinearLayout>
+    </LinearLayout>
 </LinearLayout>

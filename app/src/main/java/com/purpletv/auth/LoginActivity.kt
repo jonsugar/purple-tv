@@ -1,6 +1,8 @@
 package com.purpletv.auth
 
 import android.app.Activity
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.SpannableString
@@ -10,6 +12,8 @@ import android.text.style.StyleSpan
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.purpletv.PurpleApp
@@ -68,6 +72,8 @@ class LoginActivity : Activity() {
     }
 
     private fun show(code: DeviceCode) {
+        findViewById<ImageView>(R.id.login_qr).setImageDrawable(qrDrawable(activationLink(code.verificationUri, code.userCode)))
+        findViewById<View>(R.id.login_qr_box).visibility = View.VISIBLE
         codeBoxes.removeAllViews()
         codeBoxes.contentDescription = getString(R.string.login_code_description, code.userCode)
         code.userCode.forEachIndexed { i, ch -> codeBoxes.addView(box(ch, gapAfter = i == code.userCode.length / 2 - 1)) }
@@ -90,6 +96,15 @@ class LoginActivity : Activity() {
         layoutParams = LinearLayout.LayoutParams(dp(48), dp(62)).apply { marginEnd = dp(if (gapAfter) 21 else 7) }
     }
 
+    /** One pixel per module, enlarged without smoothing so the modules keep their sharp edges. */
+    private fun qrDrawable(text: String): BitmapDrawable {
+        val modules = qrModules(text)
+        val size = modules.size
+        val pixels = IntArray(size * size) { i -> if (modules[i / size][i % size]) QR_DARK else QR_LIGHT }
+        val bitmap = Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
+        return BitmapDrawable(resources, bitmap).apply { isFilterBitmap = false }
+    }
+
     private fun stepOpen(): CharSequence {
         val host = getString(R.string.login_activate_host)
         val text = getString(R.string.login_step_open, host)
@@ -104,6 +119,8 @@ class LoginActivity : Activity() {
 
     private companion object {
         const val RETRY_MS = 5_000L
+        const val QR_DARK = 0xFF0E0E10.toInt()
+        const val QR_LIGHT = 0xFFFFFFFF.toInt()
         const val TAG = "PurpleTV"
     }
 }
