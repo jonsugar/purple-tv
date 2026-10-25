@@ -28,6 +28,9 @@ case "$OUT" in
   *Success*) ;;
   *) echo "pm install failed" >&2; exit 1 ;;
 esac
+# A fresh install runs interpreted until the TV's overnight compile; compiled now, Home scrolls
+# with about half the long frames.
+"$PY" -I "$CLEANYOURTV/tools/tv.py" 'cmd package compile -m speed -f com.purpletv' > /dev/null
 
 if [ -n "$CHANNEL" ]; then
   "$PY" -I "$CLEANYOURTV/tools/tv.py" "am start -n com.purpletv/.player.PlayerActivity --es channel $CHANNEL"
