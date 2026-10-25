@@ -83,6 +83,7 @@ class HomePage(
             followedResult.map { list -> list.map { RowItem.StreamItem(it) } }, emptyText = R.string.followed_empty,
         )
         adapter.submit(listOf(followed) + lower)
+        adapter.warmUp(rows)
         focusedRow = -1
         rows.scrollToPosition(0)
         focusFirst()
@@ -250,8 +251,11 @@ class HomePage(
                 crossfade(false) // the two views fade into each other themselves
                 listener(onSuccess = { _, _ ->
                     if (backdrop == url) {
+                        next.visibility = View.VISIBLE
                         next.animate().alpha(1f).setDuration(FADE_MS).start()
-                        old.animate().alpha(0f).setDuration(FADE_MS).start()
+                        // A view at alpha 0 is still drawn: the covered one leaves the GPU's work.
+                        old.animate().alpha(0f).setDuration(FADE_MS)
+                            .withEndAction { if (old !== front) old.visibility = View.INVISIBLE }.start()
                         front = next
                     }
                 })

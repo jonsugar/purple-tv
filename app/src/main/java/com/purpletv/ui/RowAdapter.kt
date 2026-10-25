@@ -17,6 +17,26 @@ sealed interface RowItem {
     object Skeleton : RowItem
 }
 
+const val STREAM_CARD = 0
+const val CATEGORY_CARD = 1
+const val CHANNEL_CARD = 2
+const val SPARE_STREAM_CARDS = 12
+const val SPARE_CATEGORY_CARDS = 6
+
+/** The card an item needs; a skeleton is a stream card still waiting for its stream. */
+fun cardType(item: RowItem): Int = when (item) {
+    is RowItem.StreamItem, RowItem.Skeleton -> STREAM_CARD
+    is RowItem.CategoryItem -> CATEGORY_CARD
+    is RowItem.ChannelItem -> CHANNEL_CARD
+}
+
+/** Which spare card to make next for Home's shared pool, or none once it holds enough. */
+fun cardToWarm(spareStreams: Int, spareCategories: Int): Int? = when {
+    spareStreams < SPARE_STREAM_CARDS -> STREAM_CARD
+    spareCategories < SPARE_CATEGORY_CARDS -> CATEGORY_CARD
+    else -> null
+}
+
 /** Cards in a row (or a grid): streams, categories and channels. Stream avatars arrive after the list. */
 open class RowAdapter(
     private val onClick: (RowItem) -> Unit,
@@ -32,17 +52,12 @@ open class RowAdapter(
 
     class Holder(val card: android.view.View) : RecyclerView.ViewHolder(card)
 
-    override fun getItemViewType(position: Int) = when (getItem(position)) {
-        is RowItem.StreamItem -> STREAM
-        is RowItem.CategoryItem -> CATEGORY
-        is RowItem.ChannelItem -> CHANNEL
-        RowItem.Skeleton -> SKELETON
-    }
+    override fun getItemViewType(position: Int) = cardType(getItem(position))
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
         val card = when (viewType) {
-            STREAM, SKELETON -> StreamCardView(parent.context)
-            CATEGORY -> CategoryCardView(parent.context)
+            STREAM_CARD -> StreamCardView(parent.context)
+            CATEGORY_CARD -> CategoryCardView(parent.context)
             else -> ChannelCardView(parent.context)
         }
         card.layoutParams = RecyclerView.LayoutParams(
@@ -85,10 +100,6 @@ open class RowAdapter(
     }
 
     private companion object {
-        const val STREAM = 0
-        const val CATEGORY = 1
-        const val CHANNEL = 2
-        const val SKELETON = 3
         const val CARD_GAP_DP = 8
         const val AVATAR_PAYLOAD = "avatar"
     }

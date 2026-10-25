@@ -10,6 +10,8 @@ import androidx.recyclerview.widget.RecyclerView
 enum class RowKind(val heightDp: Int) { STREAMS(192), CATEGORIES(186), CHANNELS(140) }
 
 fun RecyclerView.fixRowHeight(kind: RowKind) {
-    layoutParams = layoutParams.apply { height = (kind.heightDp * resources.displayMetrics.density).toInt() }
+    val height = (kind.heightDp * resources.displayMetrics.density).toInt()
+    // Assigning layoutParams requests a layout: Home binds rows while it scrolls.
+    if (layoutParams.height != height) layoutParams = layoutParams.apply { this.height = height }
     setHasFixedSize(true)
 }

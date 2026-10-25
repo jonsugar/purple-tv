@@ -2,8 +2,9 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background"
     android:orientation="horizontal">
+    <!-- No background: the theme's window background is the same colour, and a second
+         full-screen fill costs this TV's GPU on every frame. -->
 
     <include layout="@layout/view_nav_rail" />
 

@@ -1,6 +1,7 @@
 package com.purpletv.home
 
 import android.content.Context
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -8,9 +9,12 @@ import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.purpletv.R
+import com.purpletv.ui.CATEGORY_CARD
 import com.purpletv.ui.RowAdapter
 import com.purpletv.ui.RowItem
 import com.purpletv.ui.RowKind
+import com.purpletv.ui.STREAM_CARD
+import com.purpletv.ui.cardToWarm
 import com.purpletv.ui.fixRowHeight
 
 /** One Home row: its title, its cards (or the failure to load them) and the avatars of its streams. */
@@ -31,7 +35,11 @@ class HomeRowsAdapter(
     private val onFocus: (row: Int, item: RowItem) -> Unit,
     private val onClick: (RowItem) -> Unit,
 ) : RecyclerView.Adapter<HomeRowsAdapter.Holder>() {
-    private val pool = RecyclerView.RecycledViewPool()
+    private val pool = RecyclerView.RecycledViewPool().apply {
+        setMaxRecycledViews(STREAM_CARD, POOL_CARDS)
+        setMaxRecycledViews(CATEGORY_CARD, POOL_CARDS)
+    }
+    private var warming = false
     private var focusRow = -1
     var rows: List<HomeRow> = emptyList()
         private set
@@ -45,6 +53,23 @@ class HomeRowsAdapter(
     fun focusFirstCard(row: Int) {
         focusRow = row
         notifyItemChanged(row)
+    }
+
+    /**
+     * Makes spare cards whenever the main thread is idle while Home is on screen. A row that
+     * takes another row's place gives its cards back only after its new ones are laid out, so
+     * without spares those were inflated inside the frame of the Down press.
+     */
+    fun warmUp(parent: RecyclerView) {
+        if (warming) return
+        warming = true
+        val maker = RowAdapter({})
+        Looper.myQueue().addIdleHandler {
+            val type = cardToWarm(pool.getRecycledViewCount(STREAM_CARD), pool.getRecycledViewCount(CATEGORY_CARD))
+            if (type != null && parent.isAttachedToWindow) pool.putRecycledView(maker.createViewHolder(parent, type))
+            warming = parent.isAttachedToWindow
+            warming
+        }
     }
 
     /** Fills in avatars that arrive after the rows; rows that already carry their own keep them. */
@@ -62,13 +87,18 @@ class HomeRowsAdapter(
         init {
             // The cards stay in their row while it is off screen. A row that gave them back on
             // detach during a layout pass came back empty, and Down then focused the empty list.
-            list.layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            list.layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false).apply {
+                // A row coming on screen brings its visible cards in the idle time before it shows,
+                // not inside the frame of the Down press (the default is 2).
+                initialPrefetchItemCount = PREFETCH_CARDS
+            }
             list.setRecycledViewPool(pool)
             list.adapter = adapter
             list.itemAnimator = null
         }
 
         private var focusWhenReady = false
+        var shownTitle: String? = null
 
         /** Focuses the first card; if the row still shows its skeleton, as soon as the cards land. */
         fun focusFirst() {
@@ -105,6 +135,10 @@ class HomeRowsAdapter(
         holder.title.text = row.title
         holder.list.fixRowHeight(row.kind)
         val items = row.items.getOrNull()
+        // A holder taking another row drops the old cards first: the diff against them would run
+        // in the background and leave them on screen meanwhile; an empty list takes the new ones at once.
+        if (holder.shownTitle != row.title) holder.adapter.submitList(null)
+        holder.shownTitle = row.title
         holder.adapter.submitList(items.orEmpty()) { holder.onCardsCommitted() }
         holder.adapter.avatars = row.avatars
         holder.empty.visibility = if (items.isNullOrEmpty()) View.VISIBLE else View.GONE
@@ -124,5 +158,7 @@ class HomeRowsAdapter(
         const val AVATARS = "avatars"
         const val FOCUS_ATTEMPTS = 10
         const val FOCUS_RETRY_MS = 32L
+        const val PREFETCH_CARDS = 5
+        const val POOL_CARDS = 30
     }
 }
