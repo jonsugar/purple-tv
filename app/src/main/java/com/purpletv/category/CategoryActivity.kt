@@ -1,6 +1,7 @@
 package com.purpletv.category
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
@@ -9,10 +10,13 @@ import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.purpletv.PurpleApp
 import com.purpletv.R
+import com.purpletv.home.MainActivity
+import com.purpletv.home.Screen
 import com.purpletv.twitch.sized
 import com.purpletv.ui.AvatarCache
 import com.purpletv.ui.GridAdapter
 import com.purpletv.ui.Nav
+import com.purpletv.ui.NavRail
 import com.purpletv.ui.Pager
 import com.purpletv.ui.RowItem
 import kotlinx.coroutines.MainScope
@@ -33,7 +37,20 @@ class CategoryActivity : Activity() {
         findViewById<View>(R.id.category_art_frame).clipToOutline = true
         intent.getStringExtra(EXTRA_ART)?.takeIf { it.isNotEmpty() }?.let {
             findViewById<ImageView>(R.id.category_art).load(sized(it, ART_W, ART_H))
+            // A tiny copy stretched over the top reads as a blur, which Android 9 cannot draw.
+            findViewById<ImageView>(R.id.category_backdrop).load(sized(it, BLUR_W, BLUR_H))
         }
+        // The rail as on the main screens; picking an item goes back to them.
+        val rail = NavRail(findViewById(R.id.nav_rail)) { screen ->
+            startActivity(
+                Intent(this, MainActivity::class.java)
+                    .putExtra(MainActivity.EXTRA_SCREEN, screen.name)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            )
+            finish()
+        }
+        rail.select(Screen.BROWSE)
+        PurpleApp.instance.snapshot.meAvatar?.let(rail::setAvatar)
 
         val grid: RecyclerView = findViewById(R.id.category_grid)
         val status: TextView = findViewById(R.id.category_status)
@@ -69,5 +86,7 @@ class CategoryActivity : Activity() {
         private const val COLUMNS = 4
         private const val ART_W = 285
         private const val ART_H = 380
+        private const val BLUR_W = 24
+        private const val BLUR_H = 32
     }
 }

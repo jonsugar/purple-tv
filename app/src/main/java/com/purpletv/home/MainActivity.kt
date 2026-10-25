@@ -45,7 +45,18 @@ class MainActivity : Activity() {
         rail = NavRail(findViewById(R.id.nav_rail), ::showScreen)
         // From the rail's Cerca, Right goes to the field above the suggestions, not into them.
         findViewById<View>(R.id.nav_search).nextFocusRightId = R.id.search_field
-        showScreen(Screen.HOME)
+        openScreen(screenFrom(intent.getStringExtra(EXTRA_SCREEN)))
+    }
+
+    /** The category page's rail opens a main screen by name. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.hasExtra(EXTRA_SCREEN)) openScreen(screenFrom(intent.getStringExtra(EXTRA_SCREEN)))
+    }
+
+    private fun openScreen(screen: Screen) {
+        showScreen(screen)
+        if (screen != Screen.HOME) rail.focus(screen)
     }
 
     override fun onStart() {
@@ -138,8 +149,9 @@ class MainActivity : Activity() {
         login()
     }
 
-    private companion object {
-        const val REQ_LOGIN = 1
-        const val SEARCH_PREFS = "search"
+    companion object {
+        const val EXTRA_SCREEN = "screen"
+        private const val REQ_LOGIN = 1
+        private const val SEARCH_PREFS = "search"
     }
 }

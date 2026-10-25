@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The left navigation rail, shared by the main screens and the category page (see NavRail). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/nav_rail"
+    android:layout_width="56dp"
+    android:layout_height="match_parent"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="20dp">
+
+    <TextView
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/badge"
+        android:gravity="center"
+        android:importantForAccessibility="no"
+        android:text="P"
+        android:textColor="#FFFFFF"
+        android:textFontWeight="800"
+        android:textSize="14sp" />
+
+    <include android:id="@+id/nav_home" layout="@layout/view_nav_item" />
+    <include android:id="@+id/nav_browse" layout="@layout/view_nav_item" />
+    <include android:id="@+id/nav_search" layout="@layout/view_nav_item" />
+
+    <Space
+        android:layout_width="1dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <FrameLayout
+        android:id="@+id/nav_profile"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:background="@drawable/nav_item_bg"
+        android:clickable="true"
+        android:contentDescription="@string/nav_profile"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/nav_avatar"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:background="@drawable/avatar_bg"
+            android:importantForAccessibility="no" />
+    </FrameLayout>
+</LinearLayout>
