@@ -28,7 +28,7 @@ class CategoryCardView(context: Context) : FrameLayout(context) {
         contentDescription = category.name
         name.text = category.name
         if (category.boxArtTemplate.isEmpty()) art.clear()
-        else art.load(sized(category.boxArtTemplate, ART_W, ART_H)) { crossfade(false) }
+        else art.load(sized(category.boxArtTemplate, ART_W, ART_H))
     }
 
     private companion object {

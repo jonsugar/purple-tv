@@ -54,7 +54,7 @@ class NavRail(private val rail: LinearLayout, private val onSelect: (Screen) -> 
     fun setAvatar(url: String) {
         rail.findViewById<ImageView>(R.id.nav_avatar).apply {
             clipToOutline = true
-            load(url) { crossfade(false); transformations(CircleCropTransformation()) }
+            load(url) { transformations(CircleCropTransformation()) }
         }
     }
 

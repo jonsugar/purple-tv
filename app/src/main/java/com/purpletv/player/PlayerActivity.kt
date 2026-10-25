@@ -392,7 +392,7 @@ class PlayerActivity : Activity() {
             stream = live
             val avatar = runCatching { AvatarCache(app.helix).urls(listOf(live.userId))[live.userId] }.getOrNull()
             avatar?.let {
-                findViewById<ImageView>(R.id.info_avatar).load(it) { crossfade(false); transformations(CircleCropTransformation()) }
+                findViewById<ImageView>(R.id.info_avatar).load(it) { transformations(CircleCropTransformation()) }
             }
             bindInfo()
         }

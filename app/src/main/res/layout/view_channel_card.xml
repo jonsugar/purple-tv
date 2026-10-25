@@ -9,8 +9,8 @@
 
         <FrameLayout
             android:id="@+id/ch_ring"
-            android:layout_width="84dp"
-            android:layout_height="84dp"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
             android:padding="5dp">
 
             <FrameLayout
@@ -33,17 +33,17 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|center_horizontal"
                 android:background="@drawable/live_badge"
-                android:paddingHorizontal="4dp"
-                android:paddingVertical="1.5dp"
+                android:paddingHorizontal="4.5dp"
+                android:paddingVertical="2dp"
                 android:text="@string/live"
                 android:textColor="#FFFFFF"
                 android:textFontWeight="700"
-                android:textSize="7sp" />
+                android:textSize="9sp" />
         </FrameLayout>
 
         <TextView
             android:id="@+id/ch_name"
-            android:minHeight="14dp"
+            android:minHeight="15dp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
@@ -51,11 +51,11 @@
             android:gravity="center_horizontal"
             android:singleLine="true"
             android:textFontWeight="600"
-            android:textSize="10sp" />
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/ch_sub"
-            android:minHeight="11dp"
+            android:minHeight="13dp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="1dp"
@@ -63,6 +63,6 @@
             android:gravity="center_horizontal"
             android:singleLine="true"
             android:textColor="@color/text_secondary"
-            android:textSize="8sp" />
+            android:textSize="9sp" />
     </LinearLayout>
 </merge>

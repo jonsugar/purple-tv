@@ -38,7 +38,7 @@ class StreamCardView(context: Context) : FrameLayout(context) {
     fun bind(stream: Stream, avatarUrl: String?) {
         contentDescription = "${stream.displayName}, ${stream.title}"
         if (stream.thumbnailTemplate.isEmpty()) thumb.clear()
-        else thumb.load(sized(stream.thumbnailTemplate, THUMB_W, THUMB_H)) { crossfade(false) }
+        else thumb.load(sized(stream.thumbnailTemplate, THUMB_W, THUMB_H))
         viewers.text = context.getString(R.string.viewers, formatViewers(stream.viewers))
         title.text = stream.title
         name.text = stream.displayName
@@ -48,7 +48,7 @@ class StreamCardView(context: Context) : FrameLayout(context) {
 
     fun bindAvatar(url: String?) {
         if (url.isNullOrEmpty()) avatar.clear()
-        else avatar.load(url) { crossfade(false); transformations(CircleCropTransformation()) }
+        else avatar.load(url) { transformations(CircleCropTransformation()) }
     }
 
     private companion object {

@@ -39,7 +39,7 @@ class ProfilePage(
     fun bind(user: User?) {
         name.text = user?.displayName.orEmpty()
         user?.profileImageUrl?.takeIf { it.isNotEmpty() }?.let {
-            avatar.load(it) { crossfade(false); transformations(CircleCropTransformation()) }
+            avatar.load(it) { transformations(CircleCropTransformation()) }
         }
         quality.text = qualityLabel()
         chat.text = chatLabel()

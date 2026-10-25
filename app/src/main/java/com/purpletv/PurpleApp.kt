@@ -1,6 +1,8 @@
 package com.purpletv
 
 import android.app.Application
+import coil.ImageLoader
+import coil.ImageLoaderFactory
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.PrefsTokenStore
 import com.purpletv.auth.TokenStore
@@ -13,7 +15,7 @@ import com.purpletv.twitch.deviceId
 import okhttp3.OkHttpClient
 
 /** Holds the app-wide singletons; screens reach them through [instance]. */
-class PurpleApp : Application() {
+class PurpleApp : Application(), ImageLoaderFactory {
     lateinit var http: OkHttpClient
     lateinit var tokens: TokenStore
     lateinit var playback: PlaybackApi
@@ -34,6 +36,9 @@ class PurpleApp : Application() {
         playerPrefs = PlayerPrefs(getSharedPreferences("player", MODE_PRIVATE))
     }
 
+    /** Pictures fade in briefly; Coil skips the fade for images already in its memory cache. */
+    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this).crossfade(IMAGE_FADE_MS).build()
+
     companion object {
         /**
          * Twitch's own TV client. Signing in with it gives one token for Helix and for playback,
@@ -42,6 +47,7 @@ class PurpleApp : Application() {
          */
         const val TV_CLIENT_ID = "ue6666qo983tsx6so1t0vnawi233wa"
         const val SCOPES = "user_read user:read:follows"
+        const val IMAGE_FADE_MS = 120
 
         lateinit var instance: PurpleApp
     }

@@ -32,7 +32,7 @@ class CategoryActivity : Activity() {
         findViewById<TextView>(R.id.category_name).text = intent.getStringExtra(EXTRA_NAME)
         findViewById<View>(R.id.category_art_frame).clipToOutline = true
         intent.getStringExtra(EXTRA_ART)?.takeIf { it.isNotEmpty() }?.let {
-            findViewById<ImageView>(R.id.category_art).load(sized(it, ART_W, ART_H)) { crossfade(false) }
+            findViewById<ImageView>(R.id.category_art).load(sized(it, ART_W, ART_H))
         }
 
         val grid: RecyclerView = findViewById(R.id.category_grid)

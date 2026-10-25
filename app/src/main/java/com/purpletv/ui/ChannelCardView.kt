@@ -37,7 +37,7 @@ class ChannelCardView(context: Context) : FrameLayout(context) {
         border.setBackgroundResource(if (channel.isLive) R.drawable.avatar_ring_live else R.drawable.avatar_ring_off)
         alpha = if (channel.isLive) 1f else OFFLINE_ALPHA
         if (channel.profileImageUrl.isEmpty()) avatar.clear()
-        else avatar.load(channel.profileImageUrl) { crossfade(false); transformations(CircleCropTransformation()) }
+        else avatar.load(channel.profileImageUrl) { transformations(CircleCropTransformation()) }
     }
 
     private companion object {

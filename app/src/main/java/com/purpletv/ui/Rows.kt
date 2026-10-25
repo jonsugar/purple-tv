@@ -7,7 +7,7 @@ import androidx.recyclerview.widget.RecyclerView
  * keeps every card measured against the same constraint: with wrap_content inside a ScrollView a
  * card measured before the list settled kept a clipped height (seen on the first search result).
  */
-enum class RowKind(val heightDp: Int) { STREAMS(172), CATEGORIES(158), CHANNELS(132) }
+enum class RowKind(val heightDp: Int) { STREAMS(192), CATEGORIES(186), CHANNELS(140) }
 
 fun RecyclerView.fixRowHeight(kind: RowKind) {
     layoutParams = layoutParams.apply { height = (kind.heightDp * resources.displayMetrics.density).toInt() }

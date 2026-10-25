@@ -2,14 +2,14 @@
 <merge xmlns:android="http://schemas.android.com/apk/res/android">
 
     <LinearLayout
-        android:layout_width="192dp"
+        android:layout_width="204dp"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
         <FrameLayout
             android:id="@+id/card_ring"
-            android:layout_width="192dp"
-            android:layout_height="112dp"
+            android:layout_width="204dp"
+            android:layout_height="118dp"
             android:padding="4dp">
 
             <FrameLayout
@@ -31,12 +31,12 @@
                     android:layout_gravity="top|start"
                     android:layout_margin="6dp"
                     android:background="@drawable/live_badge"
-                    android:paddingHorizontal="3.5dp"
-                    android:paddingVertical="1.5dp"
+                    android:paddingHorizontal="4.5dp"
+                    android:paddingVertical="2dp"
                     android:text="@string/live"
                     android:textColor="#FFFFFF"
                     android:textFontWeight="700"
-                    android:textSize="7sp" />
+                    android:textSize="9sp" />
 
                 <TextView
                     android:id="@+id/card_viewers"
@@ -45,11 +45,11 @@
                     android:layout_gravity="bottom|start"
                     android:layout_margin="6dp"
                     android:background="@drawable/viewer_pill"
-                    android:paddingHorizontal="4dp"
-                    android:paddingVertical="1.5dp"
+                    android:paddingHorizontal="5dp"
+                    android:paddingVertical="2dp"
                     android:textColor="#FFFFFF"
                     android:textFontWeight="500"
-                    android:textSize="7.5sp" />
+                    android:textSize="9sp" />
             </FrameLayout>
         </FrameLayout>
 
@@ -76,35 +76,35 @@
 
                 <TextView
                     android:id="@+id/card_title"
-                    android:minHeight="14dp"
+                    android:minHeight="16dp"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:singleLine="true"
                     android:textFontWeight="600"
-                    android:textSize="9.5sp" />
+                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/card_name"
-                    android:minHeight="12dp"
+                    android:minHeight="15dp"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="1dp"
                     android:ellipsize="end"
                     android:singleLine="true"
                     android:textFontWeight="500"
-                    android:textSize="8.5sp" />
+                    android:textSize="11sp" />
 
                 <TextView
                     android:id="@+id/card_game"
-                    android:minHeight="11dp"
+                    android:minHeight="14dp"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="1dp"
                     android:ellipsize="end"
                     android:singleLine="true"
                     android:textColor="@color/text_secondary"
-                    android:textSize="8sp" />
+                    android:textSize="10sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
