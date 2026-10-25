@@ -15,7 +15,14 @@ data class Stream(
 
 data class Category(val id: String, val name: String, val boxArtTemplate: String)
 
-data class User(val id: String, val login: String, val displayName: String, val profileImageUrl: String)
+data class User(
+    val id: String,
+    val login: String,
+    val displayName: String,
+    val profileImageUrl: String,
+    /** The picture the channel shows while offline; "" when it has none. */
+    val offlineImageUrl: String = "",
+)
 
 data class ChannelResult(
     val login: String,

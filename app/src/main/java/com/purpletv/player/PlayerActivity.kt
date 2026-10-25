@@ -45,6 +45,10 @@ import com.purpletv.chat.ChatView
 import com.purpletv.twitch.Stream
 import com.purpletv.twitch.StreamOfflineException
 import com.purpletv.ui.AvatarCache
+import com.purpletv.ui.RowAdapter
+import com.purpletv.ui.RowItem
+import com.purpletv.ui.RowKind
+import com.purpletv.ui.fixRowHeight
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -86,6 +90,9 @@ class PlayerActivity : Activity() {
     private lateinit var qualityList: LinearLayout
     private lateinit var message: View
     private lateinit var tune: View
+    private lateinit var offlinePage: View
+    private val offlineAdapter = RowAdapter({ item -> if (item is RowItem.StreamItem) zapTo(item.stream) })
+    private var channelName = ""
     private lateinit var chatView: ChatView
     private var chat: ChatClient? = null
 
@@ -139,6 +146,16 @@ class PlayerActivity : Activity() {
         findViewById<ImageView>(R.id.info_avatar).clipToOutline = true
         tune = findViewById(R.id.tune_layer)
         bindTune(tuneFromIntent())
+        offlinePage = findViewById(R.id.offline_page)
+        findViewById<View>(R.id.offline_row).apply {
+            findViewById<TextView>(R.id.row_title).setText(R.string.offline_meanwhile)
+            findViewById<RecyclerView>(R.id.row_list).apply {
+                layoutManager = LinearLayoutManager(this@PlayerActivity, LinearLayoutManager.HORIZONTAL, false)
+                adapter = offlineAdapter
+                itemAnimator = null
+                fixRowHeight(RowKind.STREAMS)
+            }
+        }
     }
 
     override fun onStart() {
@@ -181,6 +198,8 @@ class PlayerActivity : Activity() {
             }
             return super.onKeyDown(keyCode, event)
         }
+        // The offline page is a page of its own: the arrows move between its cards, Back leaves.
+        if (layer == PlayerLayer.OFFLINE) return super.onKeyDown(keyCode, event)
         if (keyCode == KeyEvent.KEYCODE_MENU) { showOverlay(); showQualityMenu(); return true }
         if (overlay.visibility == View.VISIBLE) {
             if (keyCode == KeyEvent.KEYCODE_BACK) { hideOverlay(); return true }
@@ -255,7 +274,6 @@ class PlayerActivity : Activity() {
                 Log.i(TAG, "playing $login")
             } catch (e: StreamOfflineException) {
                 on(PlayerEvent.Offline)
-                showMessage(R.string.player_offline)
             } catch (e: IOException) {
                 Log.w(TAG, "cannot resolve $login: ${e.message}")
                 retryLater()
@@ -298,6 +316,7 @@ class PlayerActivity : Activity() {
         val avatar = findViewById<ImageView>(R.id.tune_avatar)
         if (info.avatar.isNullOrEmpty()) avatar.setImageDrawable(null)
         else avatar.load(info.avatar) { transformations(CircleCropTransformation()) }
+        channelName = info.name
         findViewById<TextView>(R.id.tune_name).text = info.name
         findViewById<TextView>(R.id.tune_title).text = info.title
         findViewById<TextView>(R.id.tune_meta).text = metaText(info.game, "", info.viewers.takeIf { it > 0 })
@@ -309,11 +328,52 @@ class PlayerActivity : Activity() {
         if (next == layer && event != PlayerEvent.Started) return
         layer = next
         tune.animate().cancel()
+        if (next == PlayerLayer.OFFLINE) showOfflinePage() else offlinePage.visibility = View.GONE
         when (next) {
             PlayerLayer.TUNING -> { tune.alpha = 1f; tune.visibility = View.VISIBLE }
             PlayerLayer.VIDEO -> tune.animate().alpha(0f).setDuration(TUNE_FADE_MS).withEndAction { tune.visibility = View.GONE }.start()
             PlayerLayer.RECONNECTING, PlayerLayer.OFFLINE -> tune.visibility = View.GONE
         }
+    }
+
+    // --- Offline page
+
+    private fun showOfflinePage() {
+        hideOverlay()
+        message.visibility = View.GONE
+        offlinePage.visibility = View.VISIBLE
+        findViewById<TextView>(R.id.offline_title).text = getString(R.string.offline_title, channelName)
+        val suggestions = offlineSuggestions(app.snapshot.followedLive, login)
+        val row = findViewById<View>(R.id.offline_row)
+        row.visibility = if (suggestions.isEmpty()) View.GONE else View.VISIBLE
+        offlineAdapter.avatars = app.snapshot.avatars
+        offlineAdapter.submitList(suggestions.map { RowItem.StreamItem(it) })
+        if (suggestions.isNotEmpty()) focusFirstSuggestion(row.findViewById(R.id.row_list))
+        val shownFor = login
+        scope.launch {
+            val user = runCatching { app.helix.userByLogin(shownFor) }.getOrNull() ?: return@launch
+            if (login != shownFor || layer != PlayerLayer.OFFLINE) return@launch
+            channelName = user.displayName
+            findViewById<TextView>(R.id.offline_title).text = getString(R.string.offline_title, user.displayName)
+            if (user.profileImageUrl.isNotEmpty()) {
+                findViewById<ImageView>(R.id.offline_avatar).load(user.profileImageUrl) { transformations(CircleCropTransformation()) }
+            }
+            if (user.offlineImageUrl.isNotEmpty()) {
+                findViewById<ImageView>(R.id.offline_image).load(user.offlineImageUrl) {
+                    listener(onSuccess = { _, _ ->
+                        findViewById<View>(R.id.offline_scrim_side).visibility = View.VISIBLE
+                        findViewById<View>(R.id.offline_scrim_bottom).visibility = View.VISIBLE
+                    })
+                }
+            }
+        }
+    }
+
+    private fun focusFirstSuggestion(list: RecyclerView, attempt: Int = 0) {
+        list.postDelayed({
+            val focused = list.layoutManager?.findViewByPosition(0)?.requestFocus() == true
+            if (!focused && attempt < ZAP_FOCUS_ATTEMPTS) focusFirstSuggestion(list, attempt + 1)
+        }, if (attempt == 0) 0L else ZAP_FOCUS_RETRY_MS)
     }
 
     private fun showMessage(text: Int) {

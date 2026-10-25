@@ -57,12 +57,14 @@
     <string name="profile_chat_desc">Si apre e si chiude anche dal pulsante chat nel lettore</string>
     <string name="profile_chat_on">Visibile</string>
     <string name="profile_chat_off">Nascosta</string>
-    <string name="player_back_hint">Premi Indietro per tornare</string>
-    <string name="player_offline">Il canale è offline</string>
     <string name="player_reconnecting">Connessione persa, riprovo…</string>
     <string name="tune_label">Sintonizzazione</string>
     <string name="zap_button">Canali</string>
     <string name="zap_on_air">in onda</string>
+    <string name="offline_title">%1$s è offline</string>
+    <string name="offline_sub">Quando torna in diretta la trovi in cima alla Home, tra i canali seguiti.</string>
+    <string name="offline_badge">OFFLINE</string>
+    <string name="offline_meanwhile">Intanto in diretta tra i tuoi canali</string>
     <string name="quality_title">Qualità</string>
     <string name="quality_auto">Automatica</string>
     <string name="profile_quality">Qualità predefinita</string>

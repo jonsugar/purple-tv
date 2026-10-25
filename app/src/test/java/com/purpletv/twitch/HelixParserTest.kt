@@ -25,6 +25,14 @@ class HelixParserTest {
     }
 
     @Test
+    fun usersReadTheOfflineImage() {
+        val withImage = HelixParser.users("""{"data":[{"id":"1","login":"yucali","display_name":"Yucali","profile_image_url":"p","offline_image_url":"o"}]}""")
+        val without = HelixParser.users("""{"data":[{"id":"1","login":"yucali","display_name":"Yucali","profile_image_url":"p","offline_image_url":null}]}""")
+        assertEquals("o", withImage.single().offlineImageUrl)
+        assertEquals("", without.single().offlineImageUrl)
+    }
+
+    @Test
     fun keepsStartTime() {
         val page = HelixParser.streams("""{"data":[{"user_id":"1","user_login":"pgl","started_at":"2026-10-24T15:00:00Z"}]}""")
         assertEquals("2026-10-24T15:00:00Z", page.items.single().startedAt)

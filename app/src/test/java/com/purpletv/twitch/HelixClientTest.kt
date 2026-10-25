@@ -84,6 +84,18 @@ class HelixClientTest {
     }
 
     @Test
+    fun userByLoginAsksByLogin() = runTest {
+        server.enqueue(MockResponse().setBody("""{"data":[]}"""))
+
+        val user = helix.userByLogin("yucali")
+
+        val url = server.takeRequest().requestUrl!!
+        assertEquals("/helix/users", url.encodedPath)
+        assertEquals("yucali", url.queryParameter("login"))
+        assertNull(user)
+    }
+
+    @Test
     fun streamByLoginAsksForThatChannel() = runTest {
         server.enqueue(MockResponse().setBody(oneStream))
         server.enqueue(MockResponse().setBody("""{"data":[]}"""))

@@ -31,6 +31,7 @@ object HelixParser {
             login = it.str("login"),
             displayName = it.str("display_name"),
             profileImageUrl = it.str("profile_image_url"),
+            offlineImageUrl = it.str("offline_image_url"),
         )
     }.items
 

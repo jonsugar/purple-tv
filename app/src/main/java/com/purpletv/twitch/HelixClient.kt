@@ -27,6 +27,10 @@ class HelixClient(
         HelixParser.users(get("users", chunk.map { "id" to it }))
     }
 
+    /** One channel by its login, live or not; null when there is no such account. */
+    suspend fun userByLogin(login: String): User? =
+        HelixParser.users(get("users", listOf("login" to login.trim().lowercase()))).firstOrNull()
+
     suspend fun followedStreams(userId: String): List<Stream> =
         HelixParser.streams(get("streams/followed", listOf("user_id" to userId, "first" to "100"))).items
 
