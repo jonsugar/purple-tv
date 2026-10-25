@@ -6,11 +6,11 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import coil.load
 import com.purpletv.R
 import com.purpletv.twitch.Stream
 import com.purpletv.twitch.sized
 import com.purpletv.ui.focusScale
+import com.purpletv.ui.loadCard
 
 /** The Channels strip's cards: the live picture and the name, "in onda" under the channel playing. */
 class ZapAdapter(private val onPick: (Stream) -> Unit) : RecyclerView.Adapter<ZapAdapter.Holder>() {
@@ -39,7 +39,7 @@ class ZapAdapter(private val onPick: (Stream) -> Unit) : RecyclerView.Adapter<Za
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val stream = streams[position]
-        holder.thumb.load(sized(stream.thumbnailTemplate, THUMB_W, THUMB_H))
+        holder.thumb.loadCard(sized(stream.thumbnailTemplate, THUMB_W, THUMB_H))
         holder.name.text = stream.displayName
         holder.onAir.visibility = if (stream.login.equals(onAir, ignoreCase = true)) View.VISIBLE else View.GONE
         holder.itemView.setOnClickListener { onPick(stream) }

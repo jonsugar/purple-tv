@@ -6,7 +6,6 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
-import coil.load
 import com.purpletv.R
 import com.purpletv.twitch.Category
 import com.purpletv.twitch.sized
@@ -28,7 +27,7 @@ class CategoryCardView(context: Context) : FrameLayout(context) {
         contentDescription = category.name
         name.text = category.name
         if (category.boxArtTemplate.isEmpty()) art.clear()
-        else art.load(sized(category.boxArtTemplate, ART_W, ART_H))
+        else art.loadCard(sized(category.boxArtTemplate, ART_W, ART_H))
     }
 
     private companion object {

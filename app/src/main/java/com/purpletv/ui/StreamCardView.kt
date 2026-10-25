@@ -6,8 +6,6 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
-import coil.load
-import coil.transform.CircleCropTransformation
 import com.purpletv.R
 import com.purpletv.twitch.Stream
 import com.purpletv.twitch.formatViewers
@@ -40,7 +38,7 @@ class StreamCardView(context: Context) : FrameLayout(context) {
         listOf(R.id.card_live, R.id.card_viewers).forEach { findViewById<View>(it).visibility = View.VISIBLE }
         contentDescription = "${stream.displayName}, ${stream.title}"
         if (stream.thumbnailTemplate.isEmpty()) thumb.clear()
-        else thumb.load(sized(stream.thumbnailTemplate, THUMB_W, THUMB_H))
+        else thumb.loadCard(sized(stream.thumbnailTemplate, THUMB_W, THUMB_H))
         viewers.text = context.getString(R.string.viewers, formatViewers(stream.viewers))
         title.text = stream.title
         name.text = stream.displayName
@@ -60,7 +58,7 @@ class StreamCardView(context: Context) : FrameLayout(context) {
 
     fun bindAvatar(url: String?) {
         if (url.isNullOrEmpty()) avatar.clear()
-        else avatar.load(url) { transformations(CircleCropTransformation()) }
+        else avatar.loadCard(url, circle = true)
     }
 
     private companion object {

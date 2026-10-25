@@ -2,4 +2,5 @@
 <resources>
     <!-- A Runnable a card's owner sets, run when the card takes the focus. -->
     <item name="focus_callback" type="id" />
+    <item name="card_load" type="id" />
 </resources>
