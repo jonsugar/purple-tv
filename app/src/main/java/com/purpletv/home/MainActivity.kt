@@ -36,7 +36,7 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         content = findViewById(R.id.content)
         val avatars = AvatarCache(app.helix)
-        home = HomePage(this, app.helix, avatars)
+        home = HomePage(this, app.helix, app.home, avatars)
         browse = BrowsePage(this, scope, app.helix, avatars)
         search = SearchPage(this, scope, app.helix)
         profile = ProfilePage(this, app.playerPrefs, ::logout)

@@ -43,7 +43,12 @@
         </LinearLayout>
 
         <include android:id="@+id/row_followed" layout="@layout/view_row" />
-        <include android:id="@+id/row_top" layout="@layout/view_row" />
-        <include android:id="@+id/row_categories" layout="@layout/view_row" />
+        <!-- The rows of Twitch's own TV Home, or the most watched streams and categories without them. -->
+        <LinearLayout
+            android:id="@+id/home_shelves"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:orientation="vertical" />
     </LinearLayout>
 </ScrollView>

@@ -7,7 +7,9 @@ import com.purpletv.auth.TokenStore
 import com.purpletv.net.Http
 import com.purpletv.player.PlayerPrefs
 import com.purpletv.twitch.HelixClient
+import com.purpletv.twitch.HomeApi
 import com.purpletv.twitch.PlaybackApi
+import com.purpletv.twitch.deviceId
 import okhttp3.OkHttpClient
 
 /** Holds the app-wide singletons; screens reach them through [instance]. */
@@ -15,6 +17,7 @@ class PurpleApp : Application() {
     lateinit var http: OkHttpClient
     lateinit var tokens: TokenStore
     lateinit var playback: PlaybackApi
+    lateinit var home: HomeApi
     lateinit var auth: DeviceAuth
     lateinit var helix: HelixClient
     lateinit var playerPrefs: PlayerPrefs
@@ -26,6 +29,7 @@ class PurpleApp : Application() {
         tokens = PrefsTokenStore(getSharedPreferences("purpletv", MODE_PRIVATE))
         auth = DeviceAuth(http, TV_CLIENT_ID, SCOPES, tokens)
         playback = PlaybackApi(http, auth)
+        home = HomeApi(http, auth, deviceId = deviceId(getSharedPreferences("purpletv", MODE_PRIVATE)))
         helix = HelixClient(http, tokens, auth)
         playerPrefs = PlayerPrefs(getSharedPreferences("player", MODE_PRIVATE))
     }

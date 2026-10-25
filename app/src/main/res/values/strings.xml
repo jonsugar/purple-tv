@@ -19,7 +19,7 @@
 
     <string name="live">LIVE</string>
     <string name="viewers">%1$s spettatori</string>
-    <string name="row_followed">Canali seguiti in diretta</string>
+    <string name="row_followed">Canali seguiti live</string>
     <string name="row_top">Più visti ora</string>
     <string name="row_categories">Categorie popolari</string>
     <string name="followed_empty">Nessun canale seguito è in diretta</string>
