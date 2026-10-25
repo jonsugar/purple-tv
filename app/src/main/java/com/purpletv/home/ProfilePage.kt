@@ -1,5 +1,6 @@
 package com.purpletv.home
 
+import android.app.AlertDialog
 import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
@@ -26,7 +27,7 @@ class ProfilePage(
 
     init {
         avatar.clipToOutline = true
-        view.findViewById<View>(R.id.profile_logout).setOnClickListener { onLogout() }
+        view.findViewById<View>(R.id.profile_logout).setOnClickListener { confirmLogout() }
         view.findViewById<View>(R.id.profile_quality).setOnClickListener { nextQuality() }
         view.findViewById<View>(R.id.profile_chat).setOnClickListener {
             playerPrefs.chatVisible = !playerPrefs.chatVisible
@@ -43,6 +44,17 @@ class ProfilePage(
         }
         quality.text = qualityLabel()
         chat.text = chatLabel()
+    }
+
+    /** Signing out costs a new activation code, so it asks first, with the focus on "Annulla". */
+    private fun confirmLogout() {
+        val dialog = AlertDialog.Builder(context, R.style.PurpleDialog)
+            .setView(R.layout.dialog_logout)
+            .setNegativeButton(R.string.logout_cancel, null)
+            .setPositiveButton(R.string.logout_confirm) { _, _ -> onLogout() }
+            .create()
+        dialog.setOnShowListener { dialog.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus() }
+        dialog.show()
     }
 
     private fun chatLabel() = context.getString(if (playerPrefs.chatVisible) R.string.profile_chat_on else R.string.profile_chat_off)

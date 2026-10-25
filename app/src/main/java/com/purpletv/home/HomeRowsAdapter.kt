@@ -83,10 +83,12 @@ class HomeRowsAdapter(
         }
 
         // Right after the cards commit, the list may still hold the skeleton until its next layout,
-        // and a skeleton refuses the focus: try again shortly until a real card takes it.
+        // and a skeleton refuses the focus; a row scrolled sideways has no first card laid out.
+        // Bring the row back to its start and try again shortly until a real card takes it.
         private fun focusNow(attempt: Int = 0) {
             list.postDelayed({
                 val card = list.layoutManager?.findViewByPosition(0)
+                if (card == null) list.scrollToPosition(0)
                 val focused = card != null && card.isFocusable && card.requestFocus()
                 if (!focused && attempt < FOCUS_ATTEMPTS) focusNow(attempt + 1)
             }, if (attempt == 0) 0L else FOCUS_RETRY_MS)

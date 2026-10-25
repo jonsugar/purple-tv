@@ -42,6 +42,10 @@
 
     <string name="profile_signed_in">Accesso effettuato su questa TV</string>
     <string name="logout">Esci dall’account</string>
+    <string name="logout_confirm_title">Uscire dall’account?</string>
+    <string name="logout_confirm_message">Per rientrare servirà di nuovo il codice su twitch.tv/activate.</string>
+    <string name="logout_cancel">Annulla</string>
+    <string name="logout_confirm">Esci</string>
     <string name="app_version">Purple TV %1$s · uso personale</string>
 
     <string name="player_back">Indietro</string>

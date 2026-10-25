@@ -27,6 +27,7 @@ class MainActivity : Activity() {
     private lateinit var browse: BrowsePage
     private lateinit var search: SearchPage
     private lateinit var profile: ProfilePage
+    private var screen = Screen.HOME
     private var me: User? = null
     private var loadedAtMs = 0L
     private var awaitingLogin = false
@@ -72,7 +73,24 @@ class MainActivity : Activity() {
         if (resultCode == RESULT_OK) load() else finish()
     }
 
+    @Deprecated("Back handling of the platform Activity")
+    override fun onBackPressed() {
+        when (backAction(screen, home.isAtTop())) {
+            BackAction.GO_HOME -> {
+                showScreen(Screen.HOME)
+                home.scrollToTop()
+                home.focusFirst()
+            }
+            BackAction.HOME_TOP -> {
+                home.scrollToTop()
+                home.focusFirst()
+            }
+            BackAction.EXIT -> super.onBackPressed()
+        }
+    }
+
     fun showScreen(screen: Screen) {
+        this.screen = screen
         rail.select(screen)
         content.removeAllViews()
         content.addView(when (screen) {

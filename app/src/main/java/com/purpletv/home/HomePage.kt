@@ -52,6 +52,7 @@ class HomePage(
     private val adapter = HomeRowsAdapter(context, ::onCardFocused, ::open)
     private val hero = Hero()
     private var focusedRow = -1
+    private var onFirstCard = true
 
     init {
         rows.layoutManager = rowsLayout
@@ -105,8 +106,8 @@ class HomePage(
         adapter.submit(listOf(HomeRow(context.getString(R.string.row_followed), RowKind.STREAMS, Result.failure(RuntimeException()))))
     }
 
-    /** Whether the rows are scrolled all the way up. */
-    fun isAtTop(): Boolean = !rows.canScrollVertically(-1)
+    /** Whether Home is at its start: the rows scrolled all the way up and the first card focused last. */
+    fun isAtTop(): Boolean = !rows.canScrollVertically(-1) && onFirstCard
 
     fun scrollToTop() {
         rows.scrollToPosition(0)
@@ -120,6 +121,7 @@ class HomePage(
     }
 
     private fun onCardFocused(row: Int, item: RowItem) {
+        onFirstCard = adapter.rows.getOrNull(row)?.items?.getOrNull()?.firstOrNull() == item
         if (row >= 0 && row != focusedRow) {
             focusedRow = row
             // The focused row slides up under the hero.
