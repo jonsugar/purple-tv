@@ -2,6 +2,7 @@ package com.purpletv.home
 
 import android.content.Context
 import android.os.Looper
+import android.os.Parcelable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,6 +11,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.purpletv.R
 import com.purpletv.ui.CATEGORY_CARD
+import com.purpletv.ui.CardRow
 import com.purpletv.ui.RowAdapter
 import com.purpletv.ui.RowItem
 import com.purpletv.ui.RowKind
@@ -41,11 +43,16 @@ class HomeRowsAdapter(
     }
     private var warming = false
     private var focusRow = -1
+    // Each row's sideways position and last focused card, kept while its holder serves other rows.
+    private val rowScroll = HashMap<Int, Parcelable?>()
+    private val rowCard = HashMap<Int, Int>()
     var rows: List<HomeRow> = emptyList()
         private set
 
     fun submit(newRows: List<HomeRow>) {
         rows = newRows
+        rowScroll.clear()
+        rowCard.clear()
         notifyDataSetChanged()
     }
 
@@ -81,7 +88,7 @@ class HomeRowsAdapter(
     inner class Holder(root: View) : RecyclerView.ViewHolder(root) {
         val title: TextView = root.findViewById(R.id.row_title)
         val empty: TextView = root.findViewById(R.id.row_empty)
-        val list: RecyclerView = root.findViewById(R.id.row_list)
+        val list: CardRow = root.findViewById(R.id.row_list)
         val adapter = RowAdapter(onClick) { item -> onFocus(bindingAdapterPosition, item) }
 
         init {
@@ -99,6 +106,7 @@ class HomeRowsAdapter(
 
         private var focusWhenReady = false
         var shownTitle: String? = null
+        var boundRow = RecyclerView.NO_POSITION
 
         /** Focuses the first card; if the row still shows its skeleton, as soon as the cards land. */
         fun focusFirst() {
@@ -137,9 +145,16 @@ class HomeRowsAdapter(
         val items = row.items.getOrNull()
         // A holder taking another row drops the old cards first: the diff against them would run
         // in the background and leave them on screen meanwhile; an empty list takes the new ones at once.
-        if (holder.shownTitle != row.title) holder.adapter.submitList(null)
+        val takesAnotherRow = holder.shownTitle != row.title || holder.boundRow != position
+        if (takesAnotherRow) holder.adapter.submitList(null)
         holder.shownTitle = row.title
+        holder.boundRow = position
         holder.adapter.submitList(items.orEmpty()) { holder.onCardsCommitted() }
+        if (takesAnotherRow) {
+            // After a null list the new cards land at once, so the row's old position applies to them.
+            rowScroll[position]?.let { holder.list.layoutManager?.onRestoreInstanceState(it) }
+            holder.list.rememberedCard = rowCard[position] ?: 0
+        }
         holder.adapter.avatars = row.avatars
         holder.empty.visibility = if (items.isNullOrEmpty()) View.VISIBLE else View.GONE
         holder.empty.setText(if (items == null) R.string.row_error else row.emptyText)
@@ -147,6 +162,13 @@ class HomeRowsAdapter(
             focusRow = -1
             holder.focusFirst()
         }
+    }
+
+    // On leaving the screen, not on recycling: a row holder can also be dropped without recycling.
+    override fun onViewDetachedFromWindow(holder: Holder) {
+        if (holder.boundRow == RecyclerView.NO_POSITION) return
+        rowScroll[holder.boundRow] = holder.list.layoutManager?.onSaveInstanceState()
+        rowCard[holder.boundRow] = holder.list.rememberedCard
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
