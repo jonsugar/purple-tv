@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import coil.transform.CircleCropTransformation
 import com.purpletv.R
+import com.purpletv.player.ZapList
 import com.purpletv.twitch.HelixClient
 import com.purpletv.twitch.HomeApi
 import com.purpletv.twitch.NotLoggedInException
@@ -136,7 +137,7 @@ class HomePage(
 
     private fun open(item: RowItem) {
         when (item) {
-            is RowItem.StreamItem -> Nav.openStream(context, item.stream.login, item.stream, avatarOf(item.stream.userId))
+            is RowItem.StreamItem -> Nav.openStream(context, item.stream.login, item.stream, avatarOf(item.stream.userId), zapListFor(item))
             is RowItem.CategoryItem -> Nav.openCategory(context, item.category)
             is RowItem.ChannelItem -> Nav.openStream(context, item.channel.login)
             RowItem.Skeleton -> Unit
@@ -144,6 +145,12 @@ class HomePage(
     }
 
     private fun avatarOf(userId: String): String? = adapter.rows.firstNotNullOfOrNull { it.avatars[userId] }
+
+    /** The streams of the card's own row, for the player's Channels strip. */
+    private fun zapListFor(item: RowItem): ZapList? {
+        val row = adapter.rows.firstOrNull { it.items.getOrNull()?.contains(item) == true } ?: return null
+        return ZapList(row.title, row.items.getOrNull().orEmpty().filterIsInstance<RowItem.StreamItem>().map { it.stream })
+    }
 
     private fun skeletonRows(): List<HomeRow> = listOf(
         HomeRow(context.getString(R.string.row_followed), RowKind.STREAMS, Result.success(List(SKELETON_CARDS) { RowItem.Skeleton })),

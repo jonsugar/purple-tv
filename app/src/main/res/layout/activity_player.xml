@@ -23,6 +23,7 @@
 
         <include layout="@layout/overlay_tune" />
         <include android:id="@+id/info_overlay" layout="@layout/overlay_info" />
+        <include layout="@layout/overlay_zap" />
         <include android:id="@+id/quality_menu" layout="@layout/overlay_quality" />
 
         <LinearLayout

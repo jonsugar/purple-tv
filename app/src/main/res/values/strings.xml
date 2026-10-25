@@ -61,6 +61,8 @@
     <string name="player_offline">Il canale è offline</string>
     <string name="player_reconnecting">Connessione persa, riprovo…</string>
     <string name="tune_label">Sintonizzazione</string>
+    <string name="zap_button">Canali</string>
+    <string name="zap_on_air">in onda</string>
     <string name="quality_title">Qualità</string>
     <string name="quality_auto">Automatica</string>
     <string name="profile_quality">Qualità predefinita</string>

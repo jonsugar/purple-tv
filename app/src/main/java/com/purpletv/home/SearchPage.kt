@@ -12,6 +12,7 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.purpletv.R
+import com.purpletv.player.ZapList
 import com.purpletv.twitch.Category
 import com.purpletv.twitch.HelixClient
 import com.purpletv.twitch.asChannel
@@ -152,17 +153,19 @@ class SearchPage(
     private fun open(item: RowItem) {
         val opened = when (item) {
             is RowItem.ChannelItem -> {
-                if (item.channel.isLive) Nav.openStream(context, item.channel.login)
+                if (item.channel.isLive) Nav.openStream(context, item.channel.login, zap = followedZap())
                 else Toast.makeText(context, context.getString(R.string.channel_offline, item.channel.displayName), Toast.LENGTH_SHORT).show()
                 item.channel.isLive
             }
             is RowItem.CategoryItem -> { Nav.openCategory(context, item.category); true }
-            is RowItem.StreamItem -> { Nav.openStream(context, item.stream.login, item.stream); true }
+            is RowItem.StreamItem -> { Nav.openStream(context, item.stream.login, item.stream, zap = followedZap()); true }
             RowItem.Skeleton -> false
         }
         // Only a search that led somewhere is worth keeping; the empty state's own cards add nothing.
         if (opened) recent.add(field.text.toString())
     }
+
+    private fun followedZap() = ZapList(context.getString(R.string.row_followed), snapshot.followedLive)
 
     private inner class Row(val root: View, title: Int, kind: RowKind) {
         private val empty: TextView = root.findViewById(R.id.row_empty)

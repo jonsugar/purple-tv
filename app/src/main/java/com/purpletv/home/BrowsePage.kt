@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.purpletv.R
+import com.purpletv.player.ZapList
 import com.purpletv.twitch.Category
 import com.purpletv.twitch.HelixClient
 import com.purpletv.twitch.Stream
@@ -71,7 +72,10 @@ class BrowsePage(
     }
 
     private fun open(item: RowItem) = when (item) {
-        is RowItem.StreamItem -> Nav.openStream(context, item.stream.login, item.stream, liveAdapter.avatars[item.stream.userId])
+        is RowItem.StreamItem -> {
+            val zap = ZapList(context.getString(R.string.tab_live), liveAdapter.currentList.filterIsInstance<RowItem.StreamItem>().map { it.stream })
+            Nav.openStream(context, item.stream.login, item.stream, liveAdapter.avatars[item.stream.userId], zap)
+        }
         is RowItem.CategoryItem -> Nav.openCategory(context, item.category)
         is RowItem.ChannelItem -> Nav.openStream(context, item.channel.login)
         RowItem.Skeleton -> Unit

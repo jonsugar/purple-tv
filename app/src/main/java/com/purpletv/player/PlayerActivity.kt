@@ -11,6 +11,7 @@ import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.KeyEvent
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -31,7 +32,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.core.view.doOnLayout
 import androidx.media3.ui.PlayerView
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import coil.transform.CircleCropTransformation
 import com.purpletv.PurpleApp
@@ -67,13 +71,17 @@ class PlayerActivity : Activity() {
     private val prefs get() = app.playerPrefs
     private val retry = RetryPolicy()
 
-    private lateinit var login: String
+    private var login = ""
+    private lateinit var zap: ZapList
     private lateinit var playerView: PlayerView
     private lateinit var stage: View
     private lateinit var overlay: View
     private lateinit var backButton: View
     private lateinit var qualityButton: View
     private lateinit var chatButton: View
+    private lateinit var zapButton: View
+    private lateinit var zapStrip: View
+    private val zapAdapter = ZapAdapter { zapTo(it) }
     private lateinit var qualityMenu: View
     private lateinit var qualityList: LinearLayout
     private lateinit var message: View
@@ -101,16 +109,29 @@ class PlayerActivity : Activity() {
         backButton = findViewById(R.id.overlay_back)
         qualityButton = findViewById(R.id.overlay_quality)
         chatButton = findViewById(R.id.overlay_chat)
+        zapButton = findViewById(R.id.overlay_zap)
+        zapStrip = findViewById(R.id.zap_strip)
         backButton.setOnClickListener { finish() }
         qualityButton.setOnClickListener { showQualityMenu() }
         chatButton.setOnClickListener { toggleChat() }
-        // Back sits alone at the top; the two buttons share the bottom row.
+        zapButton.setOnClickListener { showZapStrip() }
+        // Back sits alone at the top; the other buttons share the bottom row.
         backButton.nextFocusDownId = R.id.overlay_quality
         backButton.nextFocusRightId = R.id.overlay_quality
         qualityButton.nextFocusUpId = R.id.overlay_back
         qualityButton.nextFocusLeftId = R.id.overlay_back
         chatButton.nextFocusUpId = R.id.overlay_back
-        chatButton.nextFocusRightId = R.id.overlay_chat
+        zapButton.nextFocusUpId = R.id.overlay_back
+        zap = app.zap ?: ZapList(getString(R.string.row_followed), app.snapshot.followedLive)
+        zapButton.visibility = if (zap.isEmpty()) View.GONE else View.VISIBLE
+        chatButton.nextFocusRightId = if (zap.isEmpty()) R.id.overlay_chat else R.id.overlay_zap
+        zapButton.nextFocusRightId = R.id.overlay_zap
+        findViewById<TextView>(R.id.zap_title).text = zap.title
+        findViewById<RecyclerView>(R.id.zap_list).apply {
+            layoutManager = LinearLayoutManager(this@PlayerActivity, LinearLayoutManager.HORIZONTAL, false)
+            adapter = zapAdapter
+            itemAnimator = null
+        }
         qualityMenu = findViewById(R.id.quality_menu)
         qualityList = findViewById(R.id.quality_list)
         message = findViewById(R.id.player_message)
@@ -146,6 +167,11 @@ class PlayerActivity : Activity() {
 
     /** Reached only by keys no button took: focus moves between the buttons on its own. */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (zapStrip.visibility == View.VISIBLE) {
+            if (keyCode == KeyEvent.KEYCODE_BACK) { hideZapStrip(); return true }
+            if (zapPanelKeepsKey(keyCode)) return true
+            return super.onKeyDown(keyCode, event)
+        }
         if (qualityMenu.visibility == View.VISIBLE) {
             if (keyCode == KeyEvent.KEYCODE_BACK) { hideQualityMenu(); return true }
             val row = qualityList.indexOfChild(currentFocus)
@@ -415,6 +441,12 @@ class PlayerActivity : Activity() {
         chat = ChatClient(app.http, login) { chatView.add(it) }.also { it.connect() }
     }
 
+    private fun reconnectChat() {
+        chat?.close()
+        chatView.clear()
+        chat = ChatClient(app.http, login) { chatView.add(it) }.also { it.connect() }
+    }
+
     private fun hideChat() {
         chat?.close()
         chat = null
@@ -472,6 +504,7 @@ class PlayerActivity : Activity() {
 
     private fun hideOverlay() {
         hideQualityMenu()
+        hideZapStrip()
         overlay.visibility = View.GONE
         currentFocus?.clearFocus()
         ui.removeCallbacks(autoHide)
@@ -479,10 +512,65 @@ class PlayerActivity : Activity() {
 
     private fun scheduleAutoHide() {
         ui.removeCallbacks(autoHide)
-        if (qualityMenu.visibility != View.VISIBLE) ui.postDelayed(autoHide, OVERLAY_TIMEOUT_MS)
+        if (qualityMenu.visibility != View.VISIBLE && zapStrip.visibility != View.VISIBLE) ui.postDelayed(autoHide, OVERLAY_TIMEOUT_MS)
     }
 
     private val autoHide = Runnable { hideOverlay() }
+
+    // --- Zapping
+
+    /** Opens on the channel playing; the overlay stays up while the strip is open. */
+    private fun showZapStrip() {
+        zapAdapter.submit(zap.streams, login)
+        zapStrip.visibility = View.VISIBLE
+        ui.removeCallbacks(autoHide)
+        val list = findViewById<RecyclerView>(R.id.zap_list)
+        val index = zap.focusIndex(login)
+        list.scrollToPosition(index)
+        focusZapCard(list, index)
+        // The channel's details and the buttons move up to make room for the strip.
+        zapStrip.doOnLayout { strip -> liftOverlay(-strip.height.toFloat()) }
+    }
+
+    private fun focusZapCard(list: RecyclerView, index: Int, attempt: Int = 0) {
+        list.postDelayed({
+            val focused = list.layoutManager?.findViewByPosition(index)?.requestFocus() == true
+            if (!focused && attempt < ZAP_FOCUS_ATTEMPTS) focusZapCard(list, index, attempt + 1)
+        }, if (attempt == 0) 0L else ZAP_FOCUS_RETRY_MS)
+    }
+
+    private fun hideZapStrip() {
+        if (zapStrip.visibility != View.VISIBLE) return
+        zapStrip.visibility = View.GONE
+        liftOverlay(0f)
+        if (overlay.visibility == View.VISIBLE) {
+            zapButton.requestFocus()
+            scheduleAutoHide()
+        }
+    }
+
+    private fun liftOverlay(dy: Float) {
+        for (id in intArrayOf(R.id.info_avatar_frame, R.id.info_text, R.id.overlay_buttons)) {
+            findViewById<View>(id).animate().translationY(dy).setDuration(LIFT_MS).setInterpolator(DECELERATE).start()
+        }
+    }
+
+    /** Switches channel without leaving the player: the tune-in covers the change. */
+    private fun zapTo(target: Stream) {
+        hideZapStrip()
+        hideOverlay()
+        if (target.login.equals(login, ignoreCase = true)) return
+        login = target.login.lowercase()
+        stream = target
+        bindTune(target.toTuneInfo(app.snapshot.avatars[target.userId]))
+        message.visibility = View.GONE
+        // A fresh player, as when the screen opens: the same one stopped and prepared again
+        // presented the new channel at ~52 fps on this TV (frames held for 2-3 vsyncs).
+        release()
+        start()
+        if (chat != null) reconnectChat()
+        loadStreamInfo()
+    }
 
     // --- Diagnostics
 
@@ -495,7 +583,7 @@ class PlayerActivity : Activity() {
                 Log.i(TAG, "stats ${f?.width}x${f?.height}@${f?.frameRate} rendered=${c.renderedOutputBufferCount} " +
                     "dropped=${c.droppedBufferCount} skipped=${c.skippedOutputBufferCount} " +
                     "maxConsecutiveDropped=${c.maxConsecutiveDroppedBufferCount} " +
-                    "liveOffset=${exo.currentLiveOffset}ms buffered=${exo.totalBufferedDuration}ms")
+                    "liveOffset=${exo.currentLiveOffset}ms buffered=${exo.totalBufferedDuration}ms speed=${exo.playbackParameters.speed}")
             }
             ui.postDelayed(this, STATS_INTERVAL_MS)
         }
@@ -531,6 +619,10 @@ class PlayerActivity : Activity() {
         const val EXTRA_THUMB = "tune_thumb"
         const val EXTRA_AVATAR = "tune_avatar"
         private const val TUNE_FADE_MS = 200L
+        private const val LIFT_MS = 160L
+        private const val ZAP_FOCUS_ATTEMPTS = 10
+        private const val ZAP_FOCUS_RETRY_MS = 32L
+        private val DECELERATE = DecelerateInterpolator()
         private const val TAG = "PurpleTV"
         private const val STATS_INTERVAL_MS = 5_000L
         private const val OVERLAY_TIMEOUT_MS = 6_000L

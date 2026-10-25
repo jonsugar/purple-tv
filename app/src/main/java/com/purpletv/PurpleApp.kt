@@ -12,6 +12,7 @@ import com.purpletv.player.PlayerPrefs
 import com.purpletv.twitch.HelixClient
 import com.purpletv.twitch.HomeApi
 import com.purpletv.twitch.PlaybackApi
+import com.purpletv.player.ZapList
 import com.purpletv.twitch.deviceId
 import okhttp3.OkHttpClient
 
@@ -25,6 +26,8 @@ class PurpleApp : Application(), ImageLoaderFactory {
     lateinit var helix: HelixClient
     lateinit var playerPrefs: PlayerPrefs
     val snapshot = HomeSnapshot()
+    /** The row the last stream was opened from, for the player's Channels strip. */
+    var zap: ZapList? = null
 
     override fun onCreate() {
         super.onCreate()

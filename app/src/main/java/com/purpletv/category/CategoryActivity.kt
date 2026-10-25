@@ -12,6 +12,7 @@ import com.purpletv.PurpleApp
 import com.purpletv.R
 import com.purpletv.home.MainActivity
 import com.purpletv.home.Screen
+import com.purpletv.player.ZapList
 import com.purpletv.twitch.sized
 import com.purpletv.ui.AvatarCache
 import com.purpletv.ui.GridAdapter
@@ -33,7 +34,8 @@ class CategoryActivity : Activity() {
         val helix = PurpleApp.instance.helix
         val avatars = AvatarCache(helix)
         val categoryId = intent.getStringExtra(EXTRA_ID).orEmpty()
-        findViewById<TextView>(R.id.category_name).text = intent.getStringExtra(EXTRA_NAME)
+        val name = intent.getStringExtra(EXTRA_NAME).orEmpty()
+        findViewById<TextView>(R.id.category_name).text = name
         findViewById<View>(R.id.category_art_frame).clipToOutline = true
         intent.getStringExtra(EXTRA_ART)?.takeIf { it.isNotEmpty() }?.let {
             findViewById<ImageView>(R.id.category_art).load(sized(it, ART_W, ART_H))
@@ -57,7 +59,10 @@ class CategoryActivity : Activity() {
         lateinit var pager: Pager<com.purpletv.twitch.Stream>
         lateinit var adapter: GridAdapter
         adapter = GridAdapter(COLUMNS, { item ->
-            if (item is RowItem.StreamItem) Nav.openStream(this, item.stream.login, item.stream, adapter.avatars[item.stream.userId])
+            if (item is RowItem.StreamItem) {
+                val zap = ZapList(name, adapter.currentList.filterIsInstance<RowItem.StreamItem>().map { it.stream })
+                Nav.openStream(this, item.stream.login, item.stream, adapter.avatars[item.stream.userId], zap)
+            }
         }) { pager.loadMore() }
         adapter.attachTo(grid)
 

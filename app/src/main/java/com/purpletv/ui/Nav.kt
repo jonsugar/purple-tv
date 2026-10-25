@@ -3,15 +3,21 @@ package com.purpletv.ui
 import android.content.Context
 import android.content.Intent
 import com.purpletv.category.CategoryActivity
+import com.purpletv.PurpleApp
 import com.purpletv.player.PlayerActivity
+import com.purpletv.player.ZapList
 import com.purpletv.player.toTuneInfo
 import com.purpletv.twitch.Category
 import com.purpletv.twitch.Stream
 
 /** Where cards lead. */
 object Nav {
-    /** With the card's [stream] (and [avatar]), the player shows them while the video loads. */
-    fun openStream(context: Context, login: String, stream: Stream? = null, avatar: String? = null) {
+    /**
+     * With the card's [stream] (and [avatar]), the player shows them while the video loads; [zap] is
+     * the row it came from, for the Channels strip (none: the followed channels live).
+     */
+    fun openStream(context: Context, login: String, stream: Stream? = null, avatar: String? = null, zap: ZapList? = null) {
+        PurpleApp.instance.zap = zap
         val intent = Intent(context, PlayerActivity::class.java).putExtra(PlayerActivity.EXTRA_CHANNEL, login)
         stream?.toTuneInfo(avatar)?.let { tune ->
             intent.putExtra(PlayerActivity.EXTRA_NAME, tune.name)
