@@ -38,6 +38,8 @@
     <string name="row_search_categories">Categorie</string>
     <string name="offline">Offline</string>
     <string name="search_no_results">Nessun risultato</string>
+    <string name="search_recent">Ricerche recenti</string>
+    <string name="search_suggest_categories">Categorie che potrebbero piacerti</string>
     <string name="channel_offline">%1$s è offline</string>
 
     <string name="profile_signed_in">Accesso effettuato su questa TV</string>

@@ -46,6 +46,46 @@
             android:textFontWeight="500"
             android:textSize="15sp" />
 
+        <!-- While the field holds under 2 characters: recent searches and suggestions. -->
+        <LinearLayout
+            android:id="@+id/search_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/search_recent_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_marginTop="16dp"
+                android:text="@string/search_recent"
+                android:textFontWeight="700"
+                android:textSize="15sp" />
+
+            <HorizontalScrollView
+                android:id="@+id/search_recent_scroll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:clipToPadding="false"
+                android:overScrollMode="never"
+                android:paddingStart="6dp"
+                android:paddingEnd="32dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/search_recent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
+            <include android:id="@+id/search_suggest" layout="@layout/view_row" />
+            <include android:id="@+id/search_followed" layout="@layout/view_row" />
+        </LinearLayout>
+
         <include android:id="@+id/search_channels" layout="@layout/view_row" />
         <include android:id="@+id/search_categories" layout="@layout/view_row" />
     </LinearLayout>

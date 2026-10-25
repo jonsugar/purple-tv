@@ -26,6 +26,9 @@ data class ChannelResult(
     val profileImageUrl: String,
 )
 
+/** A live stream as the channel card that shows it. */
+fun Stream.asChannel(avatar: String?) = ChannelResult(login, displayName, true, gameName, title, avatar.orEmpty())
+
 data class Page<T>(val items: List<T>, val cursor: String?)
 
 /** Fills a Helix image template (`{width}x{height}` or `%{width}x%{height}`). */

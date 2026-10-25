@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
+import android.view.View
 import android.widget.FrameLayout
 import com.purpletv.PurpleApp
 import com.purpletv.R
@@ -39,9 +40,11 @@ class MainActivity : Activity() {
         val avatars = AvatarCache(app.helix)
         home = HomePage(this, app.helix, app.home, avatars, app.snapshot)
         browse = BrowsePage(this, scope, app.helix, avatars)
-        search = SearchPage(this, scope, app.helix)
+        search = SearchPage(this, scope, app.helix, app.snapshot, RecentSearches(getSharedPreferences(SEARCH_PREFS, MODE_PRIVATE)))
         profile = ProfilePage(this, app.playerPrefs, ::logout)
         rail = NavRail(findViewById(R.id.nav_rail), ::showScreen)
+        // From the rail's Cerca, Right goes to the field above the suggestions, not into them.
+        findViewById<View>(R.id.nav_search).nextFocusRightId = R.id.search_field
         showScreen(Screen.HOME)
     }
 
@@ -96,7 +99,7 @@ class MainActivity : Activity() {
         content.addView(when (screen) {
             Screen.HOME -> home.view
             Screen.BROWSE -> browse.view.also { browse.show() }
-            Screen.SEARCH -> search.view
+            Screen.SEARCH -> search.view.also { search.show() }
             Screen.PROFILE -> profile.view.also { profile.bind(me) }
         })
     }
@@ -137,5 +140,6 @@ class MainActivity : Activity() {
 
     private companion object {
         const val REQ_LOGIN = 1
+        const val SEARCH_PREFS = "search"
     }
 }
