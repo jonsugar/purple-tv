@@ -21,6 +21,8 @@ class NavRail(private val rail: LinearLayout, private val onSelect: (Screen) -> 
         Screen.SEARCH to item(R.id.nav_search, R.drawable.ic_search, R.string.nav_search),
         Screen.PROFILE to rail.findViewById<View>(R.id.nav_profile),
     )
+    // Holds the focus between a page going away and the next one taking it; the rail stays closed.
+    private val sink: View = rail.findViewById(R.id.nav_focus_sink)
     private val density = rail.resources.displayMetrics.density
     private var expanded = false
     private var current = Screen.HOME
@@ -65,6 +67,7 @@ class NavRail(private val rail: LinearLayout, private val onSelect: (Screen) -> 
     }
 
     private fun isInside(view: View): Boolean {
+        if (view === sink) return false
         var v: View? = view
         while (v != null) {
             if (v === rail) return true

@@ -9,6 +9,14 @@
     android:paddingHorizontal="12dp"
     android:paddingVertical="20dp">
 
+    <!-- Catches the focus when the focused view goes away, which would otherwise open the rail.
+         Android 9 focuses no zero-sized view: one pixel, taken back by the margin. -->
+    <com.purpletv.ui.FocusSink
+        android:id="@+id/nav_focus_sink"
+        android:layout_width="1px"
+        android:layout_height="1px"
+        android:layout_marginBottom="-1px" />
+
     <ImageView
         android:layout_width="28dp"
         android:layout_height="28dp"
