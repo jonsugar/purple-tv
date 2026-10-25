@@ -133,6 +133,7 @@ class PlayerActivity : Activity() {
         zapButton.visibility = if (zap.isEmpty()) View.GONE else View.VISIBLE
         chatButton.nextFocusRightId = if (zap.isEmpty()) R.id.overlay_chat else R.id.overlay_zap
         zapButton.nextFocusRightId = R.id.overlay_zap
+        nameButtons()
         findViewById<TextView>(R.id.zap_title).text = zap.title
         findViewById<RecyclerView>(R.id.zap_list).apply {
             layoutManager = LinearLayoutManager(this@PlayerActivity, LinearLayoutManager.HORIZONTAL, false)
@@ -457,7 +458,10 @@ class PlayerActivity : Activity() {
         var focus: View? = null
         entries.forEach { option ->
             val row = layoutInflater.inflate(R.layout.item_quality, qualityList, false) as TextView
-            row.text = option?.label ?: getString(R.string.quality_auto)
+            row.text = option?.label ?: autoLabel(getString(R.string.quality_auto), playingOption(player?.videoFormat))
+            // Every row keeps the check's room, so the labels line up; only the current choice shows it.
+            val check = getDrawable(R.drawable.ic_check)!!.mutate().apply { alpha = if (option == current) OPAQUE else 0 }
+            row.setCompoundDrawablesRelativeWithIntrinsicBounds(check, null, null, null)
             row.setOnClickListener {
                 if (option == null) {
                     prefs.maxHeight = PlayerPrefs.AUTO
@@ -554,6 +558,23 @@ class PlayerActivity : Activity() {
         }
     }
 
+    /** The focused button's name shows above the row; the quality button adds what plays. */
+    private fun nameButtons() {
+        val label = findViewById<TextView>(R.id.overlay_button_label)
+        val buttons = listOf(qualityButton, chatButton, zapButton)
+        for (button in buttons) button.setOnFocusChangeListener { _, _ ->
+            val focused = buttons.firstOrNull { it.isFocused }
+            label.text = when (focused) {
+                qualityButton -> playingOption(player?.videoFormat)?.let { getString(R.string.overlay_quality_label, it.label) }
+                    ?: getString(R.string.quality_title)
+                chatButton -> getString(R.string.chat_title)
+                zapButton -> getString(R.string.zap_button)
+                else -> ""
+            }
+            label.visibility = if (focused == null) View.INVISIBLE else View.VISIBLE
+        }
+    }
+
     private fun showOverlay(focus: Boolean = true) {
         bindInfo()
         overlay.visibility = View.VISIBLE
@@ -610,7 +631,7 @@ class PlayerActivity : Activity() {
     }
 
     private fun liftOverlay(dy: Float) {
-        for (id in intArrayOf(R.id.info_avatar_frame, R.id.info_text, R.id.overlay_buttons)) {
+        for (id in intArrayOf(R.id.info_avatar_frame, R.id.info_text, R.id.overlay_buttons, R.id.overlay_button_label)) {
             findViewById<View>(id).animate().translationY(dy).setDuration(LIFT_MS).setInterpolator(DECELERATE).start()
         }
     }
@@ -680,6 +701,7 @@ class PlayerActivity : Activity() {
         const val EXTRA_AVATAR = "tune_avatar"
         private const val TUNE_FADE_MS = 200L
         private const val LIFT_MS = 160L
+        private const val OPAQUE = 255
         private const val ZAP_FOCUS_ATTEMPTS = 10
         private const val ZAP_FOCUS_RETRY_MS = 32L
         private val DECELERATE = DecelerateInterpolator()

@@ -38,4 +38,20 @@ class QualitiesTest {
         assertEquals("480p", pickQuality(options, maxHeight = 360, preferHighFrameRate = true)?.label)
         assertNull(pickQuality(emptyList(), maxHeight = 720, preferHighFrameRate = true))
     }
+
+    @Test
+    fun automaticSaysWhatIsPlaying() {
+        assertEquals("Automatica · 936p60", autoLabel("Automatica", QualityOption("936p60", 936, 60f)))
+    }
+
+    @Test
+    fun automaticAloneBeforeTheFirstFrame() {
+        assertEquals("Automatica", autoLabel("Automatica", null))
+    }
+
+    @Test
+    fun playingOptionNamesTheRendition() {
+        assertEquals("936p60", playingOption(video(1664, 936, 60f))?.label)
+        assertNull(playingOption(null))
+    }
 }

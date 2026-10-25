@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The official app's quality list: a dark panel above the gear, centred labels. -->
+<!-- The official app's quality list: a dark panel above the gear, titled, the current choice checked. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="95dp"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
+    android:minWidth="120dp"
     android:layout_gravity="bottom|end"
     android:layout_marginEnd="67dp"
     android:layout_marginBottom="84dp"
@@ -12,9 +13,22 @@
     android:paddingVertical="6dp"
     android:visibility="gone">
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="4dp"
+        android:text="@string/quality_title"
+        android:textColor="@color/text"
+        android:textFontWeight="700"
+        android:textSize="13sp" />
+
+    <!-- wrap_content: a vertical LinearLayout sizes itself only by its children that are not
+         match_parent, so a match_parent list left the panel as narrow as its title. -->
     <LinearLayout
         android:id="@+id/quality_list"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical" />
 </LinearLayout>

@@ -94,6 +94,20 @@
             android:textSize="11sp" />
     </LinearLayout>
 
+    <!-- The focused button's name, above the row as in the official app. -->
+    <TextView
+        android:id="@+id/overlay_button_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="45dp"
+        android:layout_marginBottom="80dp"
+        android:singleLine="true"
+        android:textColor="@color/text_soft"
+        android:textFontWeight="600"
+        android:textSize="12sp"
+        android:visibility="invisible" />
+
     <LinearLayout
         android:id="@+id/overlay_buttons"
         android:layout_width="wrap_content"

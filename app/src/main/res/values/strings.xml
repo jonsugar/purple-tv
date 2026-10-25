@@ -67,6 +67,7 @@
     <string name="offline_meanwhile">Intanto in diretta tra i tuoi canali</string>
     <string name="quality_title">Qualità</string>
     <string name="quality_auto">Automatica</string>
+    <string name="overlay_quality_label">Qualità · %1$s</string>
     <string name="profile_quality">Qualità predefinita</string>
     <string name="profile_quality_desc">Usata all’apertura di ogni diretta. OK per cambiarla</string>
 </resources>

@@ -31,6 +31,13 @@ fun pickQuality(options: List<QualityOption>, maxHeight: Int, preferHighFrameRat
     return if (preferHighFrameRate) sameHeight.maxBy { it.frameRate } else sameHeight.minBy { it.frameRate }
 }
 
+/** The rendition on screen, labelled like the menu entries; null before the first frame. */
+fun playingOption(format: Format?): QualityOption? = format?.let { qualityOptions(listOf(it)).firstOrNull() }
+
+/** "Automatica · 936p60": the automatic choice says what it picked, once something plays. */
+fun autoLabel(autoText: String, playing: QualityOption?): String =
+    if (playing == null) autoText else "$autoText · ${playing.label}"
+
 /**
  * Whether the open quality menu keeps an arrow key for itself: the focus stays on its rows instead
  * of reaching the overlay buttons beneath, where one OK on Back would leave the channel. [row] is
