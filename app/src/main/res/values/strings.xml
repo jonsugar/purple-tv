@@ -1,73 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Purple TV</string>
-    <string name="stream_unavailable">%1$s non è disponibile: %2$s</string>
+    <string name="app_name" translatable="false">Purple TV</string>
+    <string name="stream_unavailable">%1$s is not available: %2$s</string>
 
-    <string name="login_title">Accedi con il tuo account</string>
-    <string name="login_step_open">1. Sul telefono o sul computer apri %1$s</string>
+    <string name="login_title">Sign in with your account</string>
+    <string name="login_step_open">1. On your phone or computer, open %1$s</string>
     <string name="login_activate_host" translatable="false">twitch.tv/activate</string>
-    <string name="login_step_code">2. Inserisci questo codice e conferma</string>
-    <string name="login_waiting">In attesa della conferma · il codice scade tra %1$s</string>
-    <string name="login_network_error">Connessione non riuscita, riprovo tra poco…</string>
-    <string name="login_qr">Oppure inquadra il codice con il telefono</string>
-    <string name="login_code_description">Codice di attivazione %1$s</string>
+    <string name="login_step_code">2. Enter this code and confirm</string>
+    <string name="login_waiting">Waiting for confirmation · the code expires in %1$s</string>
+    <string name="login_network_error">Couldn’t connect, trying again shortly…</string>
+    <string name="login_qr">Or scan the code with your phone</string>
+    <string name="login_code_description">Activation code %1$s</string>
 
     <string name="nav_home">Home</string>
-    <string name="nav_browse">Sfoglia</string>
-    <string name="nav_search">Cerca</string>
-    <string name="nav_profile">Profilo</string>
+    <string name="nav_browse">Browse</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_profile">Profile</string>
 
     <string name="live">LIVE</string>
-    <string name="viewers">%1$s spettatori</string>
-    <string name="row_followed">Canali seguiti live</string>
-    <string name="row_top">Più visti ora</string>
-    <string name="row_categories">Categorie popolari</string>
-    <string name="hero_live_for">in diretta da %1$s</string>
-    <string name="hero_live">in diretta</string>
-    <string name="hero_category">Categoria</string>
-    <string name="followed_empty">Nessun canale seguito è in diretta</string>
-    <string name="row_error">Impossibile caricare. Controlla la connessione.</string>
+    <string name="viewers">%1$s viewers</string>
+    <!-- After a count in millions: 1.2M. -->
+    <string name="count_million">M</string>
+    <string name="row_followed">Live followed channels</string>
+    <string name="row_top">Most watched now</string>
+    <string name="row_categories">Popular categories</string>
+    <string name="hero_live_for">live for %1$s</string>
+    <string name="hero_live">live</string>
+    <string name="hero_category">Category</string>
+    <string name="followed_empty">None of your followed channels is live</string>
+    <string name="row_error">Couldn’t load. Check your connection.</string>
 
-    <string name="tab_categories">Categorie</string>
-    <string name="tab_live">Canali in diretta</string>
-    <string name="category_subtitle">Dirette in corso, dalla più seguita</string>
-    <string name="category_empty">Nessuna diretta in questa categoria</string>
+    <string name="tab_categories">Categories</string>
+    <string name="tab_live">Live channels</string>
+    <string name="category_subtitle">Live now, most watched first</string>
+    <string name="category_empty">No live streams in this category</string>
 
-    <string name="search_hint">Cerca canali e categorie</string>
-    <string name="row_channels">Canali</string>
-    <string name="row_search_categories">Categorie</string>
+    <string name="search_hint">Search channels and categories</string>
+    <string name="row_channels">Channels</string>
+    <string name="row_search_categories">Categories</string>
     <string name="offline">Offline</string>
-    <string name="search_no_results">Nessun risultato</string>
-    <string name="search_recent">Ricerche recenti</string>
-    <string name="search_suggest_categories">Categorie che potrebbero piacerti</string>
-    <string name="channel_offline">%1$s è offline</string>
+    <string name="search_no_results">No results</string>
+    <string name="search_recent">Recent searches</string>
+    <string name="search_suggest_categories">Categories you might like</string>
+    <string name="channel_offline">%1$s is offline</string>
 
-    <string name="profile_signed_in">Accesso effettuato su questa TV</string>
-    <string name="logout">Esci dall’account</string>
-    <string name="logout_confirm_title">Uscire dall’account?</string>
-    <string name="logout_confirm_message">Per rientrare servirà di nuovo il codice su twitch.tv/activate.</string>
-    <string name="logout_cancel">Annulla</string>
-    <string name="logout_confirm">Esci</string>
-    <string name="app_version">Purple TV %1$s · uso personale</string>
+    <string name="profile_signed_in">Signed in on this TV</string>
+    <string name="logout">Sign out</string>
+    <string name="logout_confirm_title">Sign out?</string>
+    <string name="logout_confirm_message">To sign back in you will need a new code at twitch.tv/activate.</string>
+    <string name="logout_cancel">Cancel</string>
+    <string name="logout_confirm">Sign out</string>
+    <string name="app_version">Purple TV %1$s</string>
 
-    <string name="player_back">Indietro</string>
-    <string name="player_viewers">%1$s spettatori</string>
+    <string name="player_back">Back</string>
+    <string name="player_viewers">%1$s viewers</string>
     <string name="chat_title">Chat</string>
-    <string name="profile_chat">Chat nel lettore</string>
-    <string name="profile_chat_desc">Si apre e si chiude anche dal pulsante chat nel lettore</string>
-    <string name="profile_chat_on">Visibile</string>
-    <string name="profile_chat_off">Nascosta</string>
-    <string name="player_reconnecting">Connessione persa, riprovo…</string>
-    <string name="tune_label">Sintonizzazione</string>
-    <string name="zap_button">Canali</string>
-    <string name="zap_on_air">in onda</string>
-    <string name="offline_title">%1$s è offline</string>
-    <string name="offline_sub">Quando torna in diretta la trovi in cima alla Home, tra i canali seguiti.</string>
+    <string name="profile_chat">Chat in the player</string>
+    <string name="profile_chat_desc">Also opens and closes from the chat button in the player</string>
+    <string name="profile_chat_on">Shown</string>
+    <string name="profile_chat_off">Hidden</string>
+    <string name="player_reconnecting">Connection lost, retrying…</string>
+    <string name="tune_label">Tuning in</string>
+    <string name="zap_button">Channels</string>
+    <string name="zap_on_air">on air</string>
+    <string name="offline_title">%1$s is offline</string>
+    <string name="offline_sub">When it goes live again, you’ll find it at the top of Home among your followed channels.</string>
     <string name="offline_badge">OFFLINE</string>
-    <string name="offline_meanwhile">Intanto in diretta tra i tuoi canali</string>
-    <string name="quality_title">Qualità</string>
-    <string name="quality_auto">Automatica</string>
-    <string name="overlay_quality_label">Qualità · %1$s</string>
-    <string name="profile_quality">Qualità predefinita</string>
-    <string name="profile_quality_desc">Usata all’apertura di ogni diretta.</string>
+    <string name="offline_meanwhile">Live now among your channels</string>
+    <string name="quality_title">Quality</string>
+    <string name="quality_auto">Auto</string>
+    <string name="overlay_quality_label">Quality · %1$s</string>
+    <string name="profile_quality">Default quality</string>
+    <string name="profile_quality_desc">Used whenever a stream opens.</string>
 </resources>

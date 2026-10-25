@@ -44,6 +44,7 @@ import com.purpletv.chat.ChatClient
 import com.purpletv.chat.ChatView
 import com.purpletv.twitch.Stream
 import com.purpletv.twitch.StreamOfflineException
+import com.purpletv.twitch.fullCount
 import com.purpletv.ui.AvatarCache
 import com.purpletv.ui.RowAdapter
 import com.purpletv.ui.RowItem
@@ -551,7 +552,7 @@ class PlayerActivity : Activity() {
 
     /** Game · uptime · viewers; the viewer count closes the line, in the official app's pink. */
     private fun metaText(game: String, since: String, viewerCount: Int?): CharSequence {
-        val viewers = viewerCount?.let { getString(R.string.player_viewers, String.format(Locale.ITALY, "%,d", it)) }.orEmpty()
+        val viewers = viewerCount?.let { getString(R.string.player_viewers, fullCount(it, Locale.getDefault())) }.orEmpty()
         val line = metaLine(game, since, viewers)
         return SpannableString(line).apply {
             if (viewers.isNotEmpty()) {

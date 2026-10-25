@@ -8,11 +8,15 @@ class NoKeyHintsTest {
 
     @Test
     fun noStringTellsWhichKeyToPress() {
-        // The user knows the remote: no "OK per…" or "Premi…" anywhere on screen.
-        val hint = Regex("""\bOK\b|\bPremi\b""", RegexOption.IGNORE_CASE)
-        val strings = Regex("""<string name="([^"]+)">([^<]*)</string>""")
-            .findAll(File("src/main/res/values/strings.xml").readText())
-            .map { it.groupValues[1] to it.groupValues[2] }
-        assertEquals(emptyList<String>(), strings.filter { hint.containsMatchIn(it.second) }.map { it.first }.toList())
+        // The user knows the remote: no "OK to…", "Press…" or "Premi…" anywhere on screen.
+        val hint = Regex("""\bOK\b|\bPress\b|\bPremi\b""", RegexOption.IGNORE_CASE)
+        val offenders = listOf("values", "values-it").flatMap { dir ->
+            Regex("""<string name="([^"]+)">([^<]*)</string>""")
+                .findAll(File("src/main/res/$dir/strings.xml").readText())
+                .filter { hint.containsMatchIn(it.groupValues[2]) }
+                .map { "$dir/${it.groupValues[1]}" }
+                .toList()
+        }
+        assertEquals(emptyList<String>(), offenders)
     }
 }

@@ -20,12 +20,12 @@ import com.purpletv.twitch.HelixClient
 import com.purpletv.twitch.HomeApi
 import com.purpletv.twitch.NotLoggedInException
 import com.purpletv.twitch.Shelf
-import com.purpletv.twitch.formatViewers
 import com.purpletv.ui.AvatarCache
 import com.purpletv.ui.Nav
 import com.purpletv.ui.RowItem
 import com.purpletv.ui.RowKind
 import com.purpletv.ui.clear
+import com.purpletv.ui.viewersText
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -234,7 +234,7 @@ class HomePage(
             }
             name.text = info.name
             game.text = info.game
-            viewers.text = info.viewers?.let { context.getString(R.string.viewers, formatViewers(it)) }.orEmpty()
+            viewers.text = info.viewers?.let { context.viewersText(it) }.orEmpty()
             if (info.avatar.isNullOrEmpty()) avatar.clear()
             else avatar.load(info.avatar) { transformations(CircleCropTransformation()) }
             crossfadeTo(info.backdrop)

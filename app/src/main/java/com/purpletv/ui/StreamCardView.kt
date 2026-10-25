@@ -8,7 +8,6 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.purpletv.R
 import com.purpletv.twitch.Stream
-import com.purpletv.twitch.formatViewers
 import com.purpletv.twitch.sized
 
 /** A live stream card: thumbnail with LIVE and viewers, then avatar, title, channel and game. */
@@ -39,7 +38,7 @@ class StreamCardView(context: Context) : FrameLayout(context) {
         contentDescription = "${stream.displayName}, ${stream.title}"
         if (stream.thumbnailTemplate.isEmpty()) thumb.clear()
         else thumb.loadCard(sized(stream.thumbnailTemplate, THUMB_W, THUMB_H))
-        viewers.text = context.getString(R.string.viewers, formatViewers(stream.viewers))
+        viewers.text = context.viewersText(stream.viewers)
         title.text = stream.title
         name.text = stream.displayName
         game.text = stream.gameName

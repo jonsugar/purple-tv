@@ -1,5 +1,8 @@
 package com.purpletv.twitch
 
+import java.text.NumberFormat
+import java.util.Locale
+
 data class Stream(
     val userId: String,
     val login: String,
@@ -43,14 +46,20 @@ fun sized(template: String, width: Int, height: Int): String = template
     .replace("%{width}", width.toString()).replace("%{height}", height.toString())
     .replace("{width}", width.toString()).replace("{height}", height.toString())
 
-/** Viewer counts the Italian way: 950, 1,2K, 12,3K, 1,2 Mln (rounded down, ",0" dropped). */
-fun formatViewers(n: Int): String = when {
+/**
+ * Short viewer counts: 950, 1.2K, 12.3K, 1.2M (rounded down, ".0" dropped). The separator and the
+ * millions suffix come from the language: Italian writes 1,2K and 1,2 Mln.
+ */
+fun formatViewers(n: Int, decimalSeparator: Char = '.', million: String = "M"): String = when {
     n < 1_000 -> n.toString()
-    n < 1_000_000 -> oneDecimal(n, 1_000) + "K"
-    else -> oneDecimal(n, 1_000_000) + " Mln"
+    n < 1_000_000 -> oneDecimal(n, 1_000, decimalSeparator) + "K"
+    else -> oneDecimal(n, 1_000_000, decimalSeparator) + million
 }
 
-private fun oneDecimal(n: Int, unit: Int): String {
+/** A count in full with the language's grouping: 32,534 in English, 32.534 in Italian. */
+fun fullCount(n: Int, locale: Locale): String = NumberFormat.getIntegerInstance(locale).format(n)
+
+private fun oneDecimal(n: Int, unit: Int, separator: Char): String {
     val tenths = n.toLong() * 10 / unit
-    return if (tenths % 10 == 0L) "${tenths / 10}" else "${tenths / 10},${tenths % 10}"
+    return if (tenths % 10 == 0L) "${tenths / 10}" else "${tenths / 10}$separator${tenths % 10}"
 }
