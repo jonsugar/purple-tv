@@ -36,7 +36,7 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         content = findViewById(R.id.content)
         val avatars = AvatarCache(app.helix)
-        home = HomePage(this, app.helix, app.home, avatars)
+        home = HomePage(this, app.helix, app.home, avatars, app.snapshot)
         browse = BrowsePage(this, scope, app.helix, avatars)
         search = SearchPage(this, scope, app.helix)
         profile = ProfilePage(this, app.playerPrefs, ::logout)
@@ -46,7 +46,6 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
-        home.start()
         when {
             awaitingLogin -> Unit
             app.tokens.accessToken == null -> { loadedAtMs = 0; login() }
@@ -97,6 +96,7 @@ class MainActivity : Activity() {
                 val user = app.helix.me()
                 me = user
                 app.tokens.userId = user.id
+                app.snapshot.meAvatar = user.profileImageUrl
                 rail.setAvatar(user.profileImageUrl)
                 home.load(user.id)
             } catch (e: NotLoggedInException) {

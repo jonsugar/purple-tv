@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A Runnable a card's owner sets, run when the card takes the focus. -->
+    <item name="focus_callback" type="id" />
+</resources>

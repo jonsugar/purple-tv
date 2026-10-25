@@ -81,6 +81,7 @@ class SearchPage(
                 else Toast.makeText(context, context.getString(R.string.channel_offline, item.channel.displayName), Toast.LENGTH_SHORT).show()
             is RowItem.CategoryItem -> Nav.openCategory(context, item.category)
             is RowItem.StreamItem -> Nav.openStream(context, item.stream.login, item.stream)
+            RowItem.Skeleton -> Unit
         }
     }
 

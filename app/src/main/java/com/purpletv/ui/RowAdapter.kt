@@ -4,6 +4,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.purpletv.R
 import com.purpletv.twitch.Category
 import com.purpletv.twitch.ChannelResult
 import com.purpletv.twitch.Stream
@@ -12,10 +13,15 @@ sealed interface RowItem {
     data class StreamItem(val stream: Stream) : RowItem
     data class CategoryItem(val category: Category) : RowItem
     data class ChannelItem(val channel: ChannelResult) : RowItem
+    /** A placeholder card while a row loads. */
+    object Skeleton : RowItem
 }
 
 /** Cards in a row (or a grid): streams, categories and channels. Stream avatars arrive after the list. */
-open class RowAdapter(private val onClick: (RowItem) -> Unit) :
+open class RowAdapter(
+    private val onClick: (RowItem) -> Unit,
+    private val onFocus: (RowItem) -> Unit = {},
+) :
     ListAdapter<RowItem, RowAdapter.Holder>(Diff) {
 
     var avatars: Map<String, String> = emptyMap()
@@ -30,11 +36,12 @@ open class RowAdapter(private val onClick: (RowItem) -> Unit) :
         is RowItem.StreamItem -> STREAM
         is RowItem.CategoryItem -> CATEGORY
         is RowItem.ChannelItem -> CHANNEL
+        RowItem.Skeleton -> SKELETON
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
         val card = when (viewType) {
-            STREAM -> StreamCardView(parent.context)
+            STREAM, SKELETON -> StreamCardView(parent.context)
             CATEGORY -> CategoryCardView(parent.context)
             else -> ChannelCardView(parent.context)
         }
@@ -50,8 +57,10 @@ open class RowAdapter(private val onClick: (RowItem) -> Unit) :
             is RowItem.StreamItem -> (holder.card as StreamCardView).bind(item.stream, avatars[item.stream.userId])
             is RowItem.CategoryItem -> (holder.card as CategoryCardView).bind(item.category)
             is RowItem.ChannelItem -> (holder.card as ChannelCardView).bind(item.channel)
+            RowItem.Skeleton -> (holder.card as StreamCardView).bindSkeleton()
         }
         holder.card.setOnClickListener { onClick(item) }
+        holder.card.setTag(R.id.focus_callback, Runnable { onFocus(item) })
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int, payloads: MutableList<Any>) {
@@ -68,6 +77,7 @@ open class RowAdapter(private val onClick: (RowItem) -> Unit) :
             a is RowItem.StreamItem && b is RowItem.StreamItem -> a.stream.userId == b.stream.userId
             a is RowItem.CategoryItem && b is RowItem.CategoryItem -> a.category.id == b.category.id
             a is RowItem.ChannelItem && b is RowItem.ChannelItem -> a.channel.login == b.channel.login
+            a is RowItem.Skeleton && b is RowItem.Skeleton -> true
             else -> false
         }
 
@@ -78,6 +88,7 @@ open class RowAdapter(private val onClick: (RowItem) -> Unit) :
         const val STREAM = 0
         const val CATEGORY = 1
         const val CHANNEL = 2
+        const val SKELETON = 3
         const val CARD_GAP_DP = 8
         const val AVATAR_PAYLOAD = "avatar"
     }

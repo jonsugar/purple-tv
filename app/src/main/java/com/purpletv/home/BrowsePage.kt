@@ -74,6 +74,7 @@ class BrowsePage(
         is RowItem.StreamItem -> Nav.openStream(context, item.stream.login, item.stream)
         is RowItem.CategoryItem -> Nav.openCategory(context, item.category)
         is RowItem.ChannelItem -> Nav.openStream(context, item.channel.login)
+        RowItem.Skeleton -> Unit
     }
 
     private fun showStatus(error: Boolean) {

@@ -22,6 +22,9 @@
     <string name="row_followed">Canali seguiti live</string>
     <string name="row_top">Più visti ora</string>
     <string name="row_categories">Categorie popolari</string>
+    <string name="hero_live_for">in diretta da %1$s</string>
+    <string name="hero_live">in diretta</string>
+    <string name="hero_category">Categoria</string>
     <string name="followed_empty">Nessun canale seguito è in diretta</string>
     <string name="row_error">Impossibile caricare. Controlla la connessione.</string>
 

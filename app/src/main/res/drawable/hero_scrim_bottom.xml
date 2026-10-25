@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lets the hero backdrop fade into the background above the rows. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:centerY="0.7"
+        android:centerColor="#D90E0E10"
+        android:endColor="#FF0E0E10"
+        android:startColor="#000E0E10" />
+</shape>

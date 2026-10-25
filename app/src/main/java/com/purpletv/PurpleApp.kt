@@ -6,6 +6,7 @@ import coil.ImageLoaderFactory
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.PrefsTokenStore
 import com.purpletv.auth.TokenStore
+import com.purpletv.home.HomeSnapshot
 import com.purpletv.net.Http
 import com.purpletv.player.PlayerPrefs
 import com.purpletv.twitch.HelixClient
@@ -23,6 +24,7 @@ class PurpleApp : Application(), ImageLoaderFactory {
     lateinit var auth: DeviceAuth
     lateinit var helix: HelixClient
     lateinit var playerPrefs: PlayerPrefs
+    val snapshot = HomeSnapshot()
 
     override fun onCreate() {
         super.onCreate()

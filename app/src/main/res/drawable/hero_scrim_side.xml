@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Darkens the hero backdrop towards the text on its left; a neutral scrim, not a colour wash. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:centerX="0.3"
+        android:centerColor="#B80E0E10"
+        android:endColor="#000E0E10"
+        android:startColor="#FF0E0E10" />
+</shape>

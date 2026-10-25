@@ -36,6 +36,8 @@ class StreamCardView(context: Context) : FrameLayout(context) {
     }
 
     fun bind(stream: Stream, avatarUrl: String?) {
+        isFocusable = true
+        listOf(R.id.card_live, R.id.card_viewers).forEach { findViewById<View>(it).visibility = View.VISIBLE }
         contentDescription = "${stream.displayName}, ${stream.title}"
         if (stream.thumbnailTemplate.isEmpty()) thumb.clear()
         else thumb.load(sized(stream.thumbnailTemplate, THUMB_W, THUMB_H))
@@ -44,6 +46,16 @@ class StreamCardView(context: Context) : FrameLayout(context) {
         name.text = stream.displayName
         game.text = stream.gameName
         bindAvatar(avatarUrl)
+    }
+
+    /** A placeholder while Home loads: the empty thumbnail frame, nothing else, not focusable. */
+    fun bindSkeleton() {
+        isFocusable = false
+        contentDescription = null
+        thumb.clear()
+        avatar.clear()
+        listOf(R.id.card_live, R.id.card_viewers).forEach { findViewById<View>(it).visibility = View.INVISIBLE }
+        listOf(title, name, game).forEach { it.text = "" }
     }
 
     fun bindAvatar(url: String?) {
