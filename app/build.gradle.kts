@@ -15,12 +15,24 @@ android {
         versionName = "0.1"
     }
 
+    signingConfigs {
+        // The release key lives outside the repo, in ~/.gradle/gradle.properties.
+        providers.gradleProperty("purpletv.storeFile").orNull?.let { path ->
+            create("release") {
+                storeFile = file(path)
+                storePassword = providers.gradleProperty("purpletv.storePassword").get()
+                keyAlias = providers.gradleProperty("purpletv.keyAlias").get()
+                keyPassword = providers.gradleProperty("purpletv.keyPassword").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Personal build: signed with the debug key so it installs without a keystore.
-            signingConfig = signingConfigs.getByName("debug")
+            // Without the release key, the debug key: anyone can build and install it.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
