@@ -26,6 +26,7 @@
 
     <include android:id="@+id/nav_home" layout="@layout/view_nav_item" />
     <include android:id="@+id/nav_browse" layout="@layout/view_nav_item" />
+    <include android:id="@+id/nav_following" layout="@layout/view_nav_item" />
     <include android:id="@+id/nav_search" layout="@layout/view_nav_item" />
 
     <Space

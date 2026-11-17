@@ -22,6 +22,13 @@ Purple TV is an unofficial client and isn't affiliated with Twitch. It doesn't b
   TV app. The focused channel fills the top of the screen with its picture, title, game and viewers.
 - Browse and search cover categories and channels. Before you type, search shows your recent
   searches and some categories you might like.
+- Following has Live, Categories and Channels tabs. It shows followed live streams, followed
+  categories with live streams, and all followed channels in alphabetical order.
+- A followed channel opens a page with Watch Live, past-stream videos and top clips. Clips can be
+  filtered to 24 hours, 7 days, 30 days or all time. Videos and clips play in the app with seeking
+  and quality selection; past-stream videos remember their position on this TV for each account.
+- Follow a category from its page or a channel from its page or the live player's heart button.
+  Existing follows show as Following, and new follows appear when you return to Following.
 - In the player, any key brings up an overlay with the quality menu, the chat and a Channels button.
   Channels opens a strip with the rest of the row you came from, so you can switch channel without
   going back to the home screen.
@@ -70,9 +77,9 @@ login is stored on the TV and only sent to Twitch.
 Purple TV is a native Android app written in Kotlin with Android views. ExoPlayer plays Twitch's HLS
 streams, OkHttp handles the network, Coil loads the images and ZXing draws the QR code.
 
-Followed channels, categories and search come from Twitch's official Helix API. The stream address
-and the home screen's recommendation rows come from the undocumented API that Twitch's own TV app
-uses, so a change on Twitch's side can break them without notice.
+Followed channels, video and clip listings, and search come from Twitch's official Helix API.
+Playback addresses, followed categories and the home screen's recommendation rows come from
+Twitch's undocumented GraphQL API, so a change on Twitch's side can break them without notice.
 
 ## Measurements
 
@@ -92,7 +99,8 @@ the commands to repeat them are in [docs/development.md](docs/development.md).
 ## Limits
 
 - Ads play as they do in Twitch's own apps. Purple TV doesn't block, skip or hide them.
-- You can't follow channels, there's no channel page and the chat is read-only.
+- Unfollowing is not available in the app, and the chat is read-only.
+- Recorded playback has no chat replay. Saved video positions stay on this TV and do not sync to Twitch.
 - Twitch can change its undocumented API at any time and break the app.
 
 ## License

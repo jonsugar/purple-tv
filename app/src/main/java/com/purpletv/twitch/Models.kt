@@ -16,7 +16,7 @@ data class Stream(
     val startedAt: String = "",
 )
 
-data class Category(val id: String, val name: String, val boxArtTemplate: String)
+data class Category(val id: String, val name: String, val boxArtTemplate: String, val viewers: Int? = null)
 
 data class User(
     val id: String,

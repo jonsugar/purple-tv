@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="#000000">
+    <androidx.media3.ui.PlayerView android:id="@+id/recorded_player_view" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:keepScreenOn="true" app:surface_type="surface_view" app:use_controller="false" app:show_buffering="always" app:shutter_background_color="#000000" />
+    <LinearLayout android:id="@+id/recorded_controls" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_gravity="bottom" android:orientation="vertical" android:paddingHorizontal="36dp" android:paddingTop="36dp"
+        android:paddingBottom="24dp" android:background="@drawable/overlay_scrim">
+        <TextView android:id="@+id/recorded_title" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textSize="18sp" android:textFontWeight="700" android:maxLines="1" android:ellipsize="end" />
+        <TextView android:id="@+id/recorded_time" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:textSize="11sp" android:textColor="@color/text_soft" />
+        <SeekBar android:id="@+id/recorded_seek" android:layout_width="match_parent" android:layout_height="32dp"
+            android:max="1000" android:progressTint="@color/purple" android:thumbTint="@color/purple_light"
+            android:contentDescription="@string/recording_position" android:focusable="true" />
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
+            <TextView android:id="@+id/recorded_back" style="@style/Tab" android:text="@string/player_back" />
+            <TextView android:id="@+id/recorded_play_pause" style="@style/Tab" android:layout_marginStart="12dp" android:text="@string/pause" />
+            <TextView android:id="@+id/recorded_start_over" style="@style/Tab" android:layout_marginStart="12dp" android:text="@string/start_over" />
+            <TextView android:id="@+id/recorded_quality" style="@style/Tab" android:layout_marginStart="12dp" android:text="@string/quality_title" />
+        </LinearLayout>
+    </LinearLayout>
+    <include android:id="@+id/recorded_quality_menu" layout="@layout/overlay_quality" />
+    <LinearLayout android:id="@+id/recorded_message" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="center" android:orientation="vertical" android:gravity="center" android:background="@drawable/quality_panel_bg"
+        android:padding="20dp" android:visibility="gone">
+        <TextView android:id="@+id/recorded_message_text" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/recording_error" android:textSize="14sp" />
+        <TextView android:id="@+id/recorded_retry" style="@style/Tab" android:layout_marginTop="12dp" android:text="@string/retry" />
+    </LinearLayout>
+</FrameLayout>

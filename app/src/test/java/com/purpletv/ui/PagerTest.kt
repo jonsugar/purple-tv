@@ -3,12 +3,45 @@ package com.purpletv.ui
 import com.purpletv.twitch.Page
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.test.runCurrent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
 
 class PagerTest {
+
+    @Test
+    fun resettingAFilterCancelsItsOldResponse() = runTest {
+        val first = CompletableDeferred<Page<String>>()
+        var oldFilter = true
+        var shown = emptyList<String>()
+        val pager = Pager(this, key = { value: String -> value }, fetch = {
+            if (oldFilter) first.await() else Page(listOf("new-filter"), null)
+        }) { items, _ -> shown = items }
+        pager.loadMore()
+        runCurrent()
+        pager.reset()
+        oldFilter = false
+        pager.loadMore()
+        advanceUntilIdle()
+        first.complete(Page(listOf("obsolete"), null))
+        advanceUntilIdle()
+        assertEquals(listOf("new-filter"), shown)
+        assertEquals(listOf("new-filter"), pager.currentItems)
+    }
+
+    @Test
+    fun authenticationFailureIsReportedAndCanTriggerLogin() = runTest {
+        var signIn = false
+        val pager = Pager<String>(this, key = { it }, fetch = { throw com.purpletv.twitch.NotLoggedInException() },
+            onAuthRequired = { signIn = true }, onPage = { _, _ -> })
+        pager.loadMore()
+        advanceUntilIdle()
+        assertTrue(signIn)
+        assertTrue(pager.hasFailed)
+    }
 
     @Test
     fun appendsPagesWithoutDuplicatesAndStopsAtTheEnd() = runTest {

@@ -43,6 +43,8 @@ import com.purpletv.R
 import com.purpletv.chat.ChatClient
 import com.purpletv.chat.ChatView
 import com.purpletv.twitch.Stream
+import com.purpletv.twitch.FollowKind
+import com.purpletv.ui.FollowButton
 import com.purpletv.twitch.StreamOfflineException
 import com.purpletv.twitch.fullCount
 import com.purpletv.ui.AvatarCache
@@ -85,6 +87,8 @@ class PlayerActivity : Activity() {
     private lateinit var qualityButton: View
     private lateinit var chatButton: View
     private lateinit var zapButton: View
+    private lateinit var followView: View
+    private lateinit var followButton: FollowButton
     private lateinit var zapStrip: View
     private val zapAdapter = ZapAdapter { zapTo(it) }
     private lateinit var qualityMenu: View
@@ -118,6 +122,13 @@ class PlayerActivity : Activity() {
         qualityButton = findViewById(R.id.overlay_quality)
         chatButton = findViewById(R.id.overlay_chat)
         zapButton = findViewById(R.id.overlay_zap)
+        followView = findViewById(R.id.overlay_follow)
+        followButton = FollowButton(followView, scope, app.follows, { app.tokens.userId }, {
+            app.tokens.clearLogin()
+            startActivity(android.content.Intent(this, com.purpletv.home.MainActivity::class.java)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP))
+            finish()
+        }, ::updateButtonLabel)
         zapStrip = findViewById(R.id.zap_strip)
         backButton.setOnClickListener { finish() }
         qualityButton.setOnClickListener { showQualityMenu() }
@@ -130,10 +141,13 @@ class PlayerActivity : Activity() {
         qualityButton.nextFocusLeftId = R.id.overlay_back
         chatButton.nextFocusUpId = R.id.overlay_back
         zapButton.nextFocusUpId = R.id.overlay_back
+        followView.nextFocusUpId = R.id.overlay_back
         zap = app.zap ?: ZapList(getString(R.string.row_followed), app.snapshot.followedLive)
         zapButton.visibility = if (zap.isEmpty()) View.GONE else View.VISIBLE
-        chatButton.nextFocusRightId = if (zap.isEmpty()) R.id.overlay_chat else R.id.overlay_zap
-        zapButton.nextFocusRightId = R.id.overlay_zap
+        chatButton.nextFocusRightId = if (zap.isEmpty()) R.id.overlay_follow else R.id.overlay_zap
+        zapButton.nextFocusRightId = R.id.overlay_follow
+        followView.nextFocusLeftId = if (zap.isEmpty()) R.id.overlay_chat else R.id.overlay_zap
+        followView.nextFocusRightId = R.id.overlay_follow
         nameButtons()
         findViewById<TextView>(R.id.zap_title).text = zap.title
         findViewById<RecyclerView>(R.id.zap_list).apply {
@@ -531,10 +545,14 @@ class PlayerActivity : Activity() {
     // --- Info overlay
 
     private fun loadStreamInfo() {
+        val requestedLogin = login
         scope.launch {
-            val live = runCatching { app.helix.streamByLogin(login) }.getOrNull() ?: return@launch
+            val live = runCatching { app.helix.streamByLogin(requestedLogin) }.getOrNull() ?: return@launch
+            if (login != requestedLogin) return@launch
             stream = live
+            followButton.bind(FollowKind.CHANNEL, live.userId)
             val avatar = runCatching { AvatarCache(app.helix).urls(listOf(live.userId))[live.userId] }.getOrNull()
+            if (login != requestedLogin) return@launch
             avatar?.let {
                 findViewById<ImageView>(R.id.info_avatar).load(it) { transformations(CircleCropTransformation()) }
             }
@@ -563,19 +581,24 @@ class PlayerActivity : Activity() {
 
     /** The focused button's name shows above the row; the quality button adds what plays. */
     private fun nameButtons() {
-        val label = findViewById<TextView>(R.id.overlay_button_label)
-        val buttons = listOf(qualityButton, chatButton, zapButton)
-        for (button in buttons) button.setOnFocusChangeListener { _, _ ->
-            val focused = buttons.firstOrNull { it.isFocused }
-            label.text = when (focused) {
-                qualityButton -> playingOption(player?.videoFormat)?.let { getString(R.string.overlay_quality_label, it.label) }
-                    ?: getString(R.string.quality_title)
-                chatButton -> getString(R.string.chat_title)
-                zapButton -> getString(R.string.zap_button)
-                else -> ""
-            }
-            label.visibility = if (focused == null) View.INVISIBLE else View.VISIBLE
+        for (button in listOf(qualityButton, chatButton, zapButton, followView)) {
+            button.setOnFocusChangeListener { _, _ -> updateButtonLabel() }
         }
+    }
+
+    private fun updateButtonLabel() {
+        val label = findViewById<TextView>(R.id.overlay_button_label)
+        val buttons = listOf(qualityButton, chatButton, zapButton, followView)
+        val focused = buttons.firstOrNull { it.isFocused }
+        label.text = when (focused) {
+            qualityButton -> playingOption(player?.videoFormat)?.let { getString(R.string.overlay_quality_label, it.label) }
+                ?: getString(R.string.quality_title)
+            chatButton -> getString(R.string.chat_title)
+            zapButton -> getString(R.string.zap_button)
+            followView -> followView.contentDescription
+            else -> ""
+        }
+        label.visibility = if (focused == null) View.INVISIBLE else View.VISIBLE
     }
 
     private fun showOverlay(focus: Boolean = true) {
@@ -645,6 +668,8 @@ class PlayerActivity : Activity() {
         hideOverlay()
         if (target.login.equals(login, ignoreCase = true)) return
         login = target.login.lowercase()
+        followButton.clear()
+        followButton.bind(FollowKind.CHANNEL, target.userId)
         stream = target
         bindTune(target.toTuneInfo(app.snapshot.avatars[target.userId]))
         message.visibility = View.GONE

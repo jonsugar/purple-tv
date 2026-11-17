@@ -14,11 +14,13 @@ import com.purpletv.twitch.sized
 class CategoryCardView(context: Context) : FrameLayout(context) {
     private val art: ImageView
     private val name: TextView
+    private val viewers: TextView
 
     init {
         LayoutInflater.from(context).inflate(R.layout.view_category_card, this, true)
         art = findViewById(R.id.cat_art)
         name = findViewById(R.id.cat_name)
+        viewers = findViewById(R.id.cat_viewers)
         findViewById<View>(R.id.cat_frame).clipToOutline = true
         focusScale(findViewById(R.id.cat_ring))
     }
@@ -26,6 +28,8 @@ class CategoryCardView(context: Context) : FrameLayout(context) {
     fun bind(category: Category) {
         contentDescription = category.name
         name.text = category.name
+        viewers.visibility = if (category.viewers == null) View.GONE else View.VISIBLE
+        viewers.text = category.viewers?.let(context::viewersText).orEmpty()
         if (category.boxArtTemplate.isEmpty()) art.clear()
         else art.loadCard(sized(category.boxArtTemplate, ART_W, ART_H))
     }

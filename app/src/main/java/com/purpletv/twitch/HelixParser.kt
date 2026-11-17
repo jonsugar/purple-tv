@@ -6,6 +6,20 @@ import org.json.JSONObject
 /** Helix responses to models. Missing or null fields become "" or 0, never an exception. */
 object HelixParser {
 
+    fun followedChannels(json: String): Page<FollowedChannel> = page(json) {
+        FollowedChannel(it.str("broadcaster_id"), it.str("broadcaster_login"), it.str("broadcaster_name"), it.str("followed_at"))
+    }
+
+    fun videos(json: String): Page<Recording> = page(json) {
+        Recording(it.str("id"), RecordingKind.VOD, it.str("user_id"), it.str("title"), it.str("thumbnail_url"),
+            durationSeconds(it.str("duration")), it.optInt("view_count"), it.str("published_at"))
+    }
+
+    fun clips(json: String): Page<Recording> = page(json) {
+        Recording(it.str("id"), RecordingKind.CLIP, it.str("broadcaster_id"), it.str("title"), it.str("thumbnail_url"),
+            it.optDouble("duration", 0.0).toLong(), it.optInt("view_count"), it.str("created_at"))
+    }
+
     fun streams(json: String): Page<Stream> = page(json) {
         Stream(
             userId = it.str("user_id"),

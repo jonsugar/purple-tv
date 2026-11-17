@@ -38,5 +38,15 @@
             android:singleLine="true"
             android:textFontWeight="600"
             android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/cat_viewers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="4dp"
+            android:singleLine="true"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp"
+            android:visibility="gone" />
     </LinearLayout>
 </merge>

@@ -87,6 +87,12 @@
                         android:text="@string/category_subtitle"
                         android:textColor="@color/text_soft"
                         android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/category_follow"
+                        style="@style/Tab"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/follow_loading" />
                 </LinearLayout>
             </LinearLayout>
 

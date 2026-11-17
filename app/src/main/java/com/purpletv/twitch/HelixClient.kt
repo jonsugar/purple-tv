@@ -34,6 +34,23 @@ class HelixClient(
     suspend fun followedStreams(userId: String): List<Stream> =
         HelixParser.streams(get("streams/followed", listOf("user_id" to userId, "first" to "100"))).items
 
+    suspend fun followedStreamsPage(userId: String, cursor: String? = null): Page<Stream> =
+        HelixParser.streams(get("streams/followed", listOfNotNull("user_id" to userId, "first" to "100", cursor?.let { "after" to it })))
+
+    suspend fun followedChannels(userId: String, cursor: String? = null): Page<FollowedChannel> =
+        HelixParser.followedChannels(get("channels/followed", listOfNotNull("user_id" to userId, "first" to "100", cursor?.let { "after" to it })))
+
+    suspend fun allFollowedChannels(userId: String): List<FollowedChannel> =
+        sortedChannels(collectPages(key = { it.id }) { followedChannels(userId, it) })
+
+    suspend fun videos(broadcasterId: String, cursor: String? = null): Page<Recording> =
+        HelixParser.videos(get("videos", listOfNotNull("user_id" to broadcasterId, "type" to "archive", "sort" to "time",
+            "first" to PAGE_SIZE, cursor?.let { "after" to it })))
+
+    suspend fun clips(broadcasterId: String, window: ClipWindow, cursor: String? = null): Page<Recording> =
+        HelixParser.clips(get("clips", listOfNotNull("broadcaster_id" to broadcasterId, "first" to PAGE_SIZE,
+            window.start?.let { "started_at" to it }, window.end?.let { "ended_at" to it }, cursor?.let { "after" to it })))
+
     /** The live stream of one channel, or null when it is offline. */
     suspend fun streamByLogin(login: String): Stream? =
         HelixParser.streams(get("streams", listOf("user_login" to login.trim().lowercase()))).items.firstOrNull()

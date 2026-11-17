@@ -60,7 +60,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|start"
         android:layout_marginStart="112dp"
-        android:layout_marginEnd="250dp"
+        android:layout_marginEnd="302dp"
         android:layout_marginBottom="55dp"
         android:orientation="vertical">
 
@@ -153,6 +153,19 @@
             android:focusable="true"
             android:scaleType="center"
             android:src="@drawable/ic_channels"
+            android:tint="@color/overlay_content" />
+
+        <ImageView
+            android:id="@+id/overlay_follow"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="17dp"
+            android:background="@drawable/overlay_icon_bg"
+            android:clickable="true"
+            android:contentDescription="@string/follow"
+            android:focusable="true"
+            android:scaleType="center"
+            android:src="@drawable/ic_following"
             android:tint="@color/overlay_content" />
     </LinearLayout>
 </FrameLayout>

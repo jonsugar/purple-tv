@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:clipChildren="false">
+    <TextView android:id="@+id/recording_row_status" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginStart="10dp" android:layout_marginTop="8dp" android:text="@string/loading" android:textSize="11sp" android:textColor="@color/text_secondary" />
+    <TextView android:id="@+id/recording_row_retry" style="@style/Tab" android:layout_marginStart="4dp" android:text="@string/retry" android:visibility="gone" />
+    <com.purpletv.ui.CardRow android:id="@+id/recording_row_list" android:layout_width="match_parent" android:layout_height="172dp"
+        android:paddingStart="6dp" android:paddingTop="8dp" android:paddingBottom="8dp" android:clipChildren="false" android:clipToPadding="false" android:overScrollMode="never" />
+</LinearLayout>

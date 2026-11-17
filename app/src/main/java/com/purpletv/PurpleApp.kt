@@ -11,6 +11,11 @@ import com.purpletv.net.Http
 import com.purpletv.player.PlayerPrefs
 import com.purpletv.twitch.HelixClient
 import com.purpletv.twitch.HomeApi
+import com.purpletv.twitch.FollowingApi
+import com.purpletv.twitch.RecordedPlaybackApi
+import com.purpletv.twitch.TwitchGraphQl
+import com.purpletv.twitch.FollowApi
+import com.purpletv.twitch.FollowChanges
 import com.purpletv.twitch.PlaybackApi
 import com.purpletv.player.ZapList
 import com.purpletv.twitch.deviceId
@@ -22,6 +27,10 @@ class PurpleApp : Application(), ImageLoaderFactory {
     lateinit var tokens: TokenStore
     lateinit var playback: PlaybackApi
     lateinit var home: HomeApi
+    lateinit var following: FollowingApi
+    lateinit var follows: FollowApi
+    val followChanges = FollowChanges()
+    lateinit var recordedPlayback: RecordedPlaybackApi
     lateinit var auth: DeviceAuth
     lateinit var helix: HelixClient
     lateinit var playerPrefs: PlayerPrefs
@@ -38,6 +47,10 @@ class PurpleApp : Application(), ImageLoaderFactory {
         playback = PlaybackApi(http, auth)
         home = HomeApi(http, auth, deviceId = deviceId(getSharedPreferences("purpletv", MODE_PRIVATE)))
         helix = HelixClient(http, tokens, auth)
+        val gql = TwitchGraphQl(http, auth)
+        following = FollowingApi(gql)
+        follows = FollowApi(gql, followChanges)
+        recordedPlayback = RecordedPlaybackApi(http, gql)
         playerPrefs = PlayerPrefs(getSharedPreferences("player", MODE_PRIVATE))
     }
 

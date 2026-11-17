@@ -18,6 +18,7 @@ class NavRail(private val rail: LinearLayout, private val onSelect: (Screen) -> 
     private val items = mapOf(
         Screen.HOME to item(R.id.nav_home, R.drawable.ic_home, R.string.nav_home),
         Screen.BROWSE to item(R.id.nav_browse, R.drawable.ic_browse, R.string.nav_browse),
+        Screen.FOLLOWING to item(R.id.nav_following, R.drawable.ic_following, R.string.nav_following),
         Screen.SEARCH to item(R.id.nav_search, R.drawable.ic_search, R.string.nav_search),
         Screen.PROFILE to rail.findViewById<View>(R.id.nav_profile),
     )
@@ -31,7 +32,7 @@ class NavRail(private val rail: LinearLayout, private val onSelect: (Screen) -> 
         items.forEach { (screen, view) -> view.setOnClickListener { onSelect(screen) } }
         // Up and Down stay inside the rail: Profilo sits at the bottom, and the nearest view below
         // Cerca would otherwise be a card on the page.
-        val column = listOf(Screen.HOME, Screen.BROWSE, Screen.SEARCH, Screen.PROFILE).map { items.getValue(it) }
+        val column = listOf(Screen.HOME, Screen.BROWSE, Screen.FOLLOWING, Screen.SEARCH, Screen.PROFILE).map { items.getValue(it) }
         column.forEachIndexed { i, view ->
             view.nextFocusUpId = column[maxOf(i - 1, 0)].id
             view.nextFocusDownId = column[minOf(i + 1, column.lastIndex)].id

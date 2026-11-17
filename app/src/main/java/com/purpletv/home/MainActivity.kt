@@ -26,12 +26,14 @@ class MainActivity : Activity() {
     private lateinit var rail: NavRail
     private lateinit var home: HomePage
     private lateinit var browse: BrowsePage
+    private lateinit var following: FollowingPage
     private lateinit var search: SearchPage
     private lateinit var profile: ProfilePage
     private var screen = Screen.HOME
     private var me: User? = null
     private var loadedAtMs = 0L
     private var awaitingLogin = false
+    private var followRevision = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,9 +42,13 @@ class MainActivity : Activity() {
         val avatars = AvatarCache(app.helix)
         home = HomePage(this, app.helix, app.home, avatars, app.snapshot)
         browse = BrowsePage(this, scope, app.helix, avatars)
+        following = FollowingPage(this, scope, app.helix, app.following, avatars, ::requireLogin) { tabId ->
+            findViewById<View>(R.id.nav_following).nextFocusRightId = tabId
+        }
         search = SearchPage(this, scope, app.helix, app.snapshot, RecentSearches(getSharedPreferences(SEARCH_PREFS, MODE_PRIVATE)))
         profile = ProfilePage(this, app.playerPrefs, ::logout)
         rail = NavRail(findViewById(R.id.nav_rail), ::showScreen)
+        following.bindAccount(app.tokens.userId)
         // From the rail's Cerca, Right goes to the field above the suggestions, not into them.
         findViewById<View>(R.id.nav_search).nextFocusRightId = R.id.search_field
         openScreen(screenFrom(intent.getStringExtra(EXTRA_SCREEN)))
@@ -61,6 +67,12 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        if (followRevision != app.followChanges.revision) {
+            followRevision = app.followChanges.revision
+            loadedAtMs = 0
+        }
+        following.bindAccount(app.tokens.userId)
+        if (screen == Screen.FOLLOWING) following.show()
         when {
             awaitingLogin -> Unit
             app.tokens.accessToken == null -> { loadedAtMs = 0; login() }
@@ -83,6 +95,7 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != REQ_LOGIN) return
         awaitingLogin = false
+        following.bindAccount(null)
         // A new login, maybe another account: the rows and the profile load again.
         if (resultCode == RESULT_OK) load() else finish()
     }
@@ -110,15 +123,23 @@ class MainActivity : Activity() {
         content.addView(when (screen) {
             Screen.HOME -> home.view
             Screen.BROWSE -> browse.view.also { browse.show() }
+            Screen.FOLLOWING -> following.view.also { following.show() }
             Screen.SEARCH -> search.view.also { search.show() }
             Screen.PROFILE -> profile.view.also { profile.bind(me) }
         })
     }
 
     private fun login() {
+        if (awaitingLogin) return
         awaitingLogin = true
         @Suppress("DEPRECATION")
         startActivityForResult(Intent(this, LoginActivity::class.java), REQ_LOGIN)
+    }
+
+    private fun requireLogin() {
+        app.tokens.clearLogin()
+        following.bindAccount(null)
+        login()
     }
 
     private fun load() {
@@ -128,6 +149,7 @@ class MainActivity : Activity() {
                 val user = app.helix.me()
                 me = user
                 app.tokens.userId = user.id
+                following.bindAccount(user.id)
                 app.snapshot.meAvatar = user.profileImageUrl
                 rail.setAvatar(user.profileImageUrl)
                 home.load(user.id)
@@ -143,6 +165,7 @@ class MainActivity : Activity() {
 
     private fun logout() {
         app.tokens.clearLogin()
+        following.bindAccount(null)
         me = null
         loadedAtMs = 0
         showScreen(Screen.HOME)

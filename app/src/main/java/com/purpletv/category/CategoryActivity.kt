@@ -12,8 +12,11 @@ import com.purpletv.PurpleApp
 import com.purpletv.R
 import com.purpletv.home.MainActivity
 import com.purpletv.home.Screen
+import com.purpletv.home.screenFrom
 import com.purpletv.player.ZapList
 import com.purpletv.twitch.sized
+import com.purpletv.twitch.FollowKind
+import com.purpletv.ui.FollowButton
 import com.purpletv.ui.AvatarCache
 import com.purpletv.ui.GridAdapter
 import com.purpletv.ui.Nav
@@ -35,6 +38,12 @@ class CategoryActivity : Activity() {
         val avatars = AvatarCache(helix)
         val categoryId = intent.getStringExtra(EXTRA_ID).orEmpty()
         val name = intent.getStringExtra(EXTRA_NAME).orEmpty()
+        val app = PurpleApp.instance
+        FollowButton(findViewById(R.id.category_follow), scope, app.follows, { app.tokens.userId }, {
+            app.tokens.clearLogin()
+            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+            finish()
+        }).bind(FollowKind.CATEGORY, categoryId)
         findViewById<TextView>(R.id.category_name).text = name
         findViewById<View>(R.id.category_art_frame).clipToOutline = true
         intent.getStringExtra(EXTRA_ART)?.takeIf { it.isNotEmpty() }?.let {
@@ -51,7 +60,7 @@ class CategoryActivity : Activity() {
             )
             finish()
         }
-        rail.select(Screen.BROWSE)
+        rail.select(intent.getStringExtra(EXTRA_ORIGIN)?.let(::screenFrom) ?: Screen.BROWSE)
         PurpleApp.instance.snapshot.meAvatar?.let(rail::setAvatar)
 
         val grid: RecyclerView = findViewById(R.id.category_grid)
@@ -89,6 +98,7 @@ class CategoryActivity : Activity() {
         const val EXTRA_ID = "category_id"
         const val EXTRA_NAME = "category_name"
         const val EXTRA_ART = "category_art"
+        const val EXTRA_ORIGIN = "category_origin"
         private const val COLUMNS = 4
         private const val ART_W = 285
         private const val ART_H = 380

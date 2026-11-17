@@ -18,6 +18,10 @@ so uninstall the published build before installing your own.
 
 ## Install on the TV
 
+For this checkout's Sony TV connection, relay workaround, and signing instructions, see
+[AGENTS.md](../AGENTS.md). Use that workflow if direct ADB reports `No route to host` while the TV's
+ADB port accepts TCP connections.
+
 `tools/install.sh` builds the app, installs it over the network and compiles it in one step. It uses
 the ADB client of [CleanYourTV](https://github.com/Gathin23/cleanyourtv), expected in
 `~/development/cleanyourtv` with its `tools/venv`. `CLEANYOURTV` changes that path and `TV_HOST` the
@@ -85,6 +89,41 @@ What's left is about one frame of 70 to 100 ms each time a new row comes into vi
 needs to fill six cards.
 
 ## Notes
+
+### Following and recorded playback
+
+Following reuses the main navigation rail, tabs, category cards and stream grids. Channel banner
+cards open a separate channel activity with paged Videos and Clips rows. Each clip filter captures
+one UTC time window for all of its pages. Replacing a filter cancels the previous pager, so a late
+response cannot replace the current results. The complete followed-channel list is sorted before
+display, with profiles loaded in batches as the grid scrolls. Lists refresh after five minutes when
+Following is shown again, and account changes clear their state.
+
+`FollowingApi` reads the internal `currentUser.followedGames` connection. It uses `nodes`, not
+`edges`, has no cursor argument, and accepts at most 100 categories. `RecordedPlaybackApi` resolves signed VOD playlists and clip
+renditions when playback starts. These authenticated GraphQL operations use the existing device
+login, retry a 401 after one token refresh, and report missing or restricted content separately from
+network failures. Tokens and signed playback URLs are not written to logs.
+
+`FollowApi` reads channel follow status and all followed categories, including offline categories.
+It uses Twitch's `followUser` and `followGame` mutations with the existing signed-in TV client.
+The category header, channel page, and live player's heart button share one controller which shows
+the current state, prevents duplicate clicks, and leaves the state unchanged after a failed write.
+Successful writes increment a revision so Home and Following refresh when the user returns.
+These controls add follows only; they do not remove an existing follow.
+
+`RecordedPlayerActivity` uses the same SurfaceView and decoder policy as live playback, with its own
+controls. Focusing the timeline allows ten-second seeking; media transport keys also work. VOD
+positions are saved every ten seconds and on leaving playback, keyed by account and video in the
+`vod_progress` preferences. Start over and completed playback clear the saved position.
+
+Run `./gradlew testDebugUnitTest assembleDebug lintDebug` for the local checks. Before accepting a
+deployed build, use the 1280×720 virtual TV to check each Following tab, multiple pages of channels,
+category navigation, Watch Live, every clip filter, VOD and clip seeking, quality changes, and VOD
+resume after restarting the app. Check Back restores the selected card, and try empty results,
+missing images, unavailable recordings, network failures, and signing in with another account.
+
+### Platform notes
 
 - The launcher banner (`res/drawable-nodpi/banner.png`) is generated with
   `python3 tools/make-banner.py app/src/main/res/font/inter_bold.ttf app/src/main/res/drawable-nodpi/banner.png`.
