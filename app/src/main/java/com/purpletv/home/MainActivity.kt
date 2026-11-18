@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.os.SystemClock
+import android.view.KeyEvent
 import android.view.View
 import android.widget.FrameLayout
 import com.purpletv.PurpleApp
@@ -37,6 +38,8 @@ class MainActivity : Activity() {
     private var awaitingLogin = false
     private var followRevision = app.followChanges.revision
     private var followUpdates: Job? = null
+    private var pinUpdates: Job? = null
+    private var pinRevision = app.pins.revisions.value
     private var homeLoad: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,9 +47,9 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         content = findViewById(R.id.content)
         val avatars = AvatarCache(app.helix)
-        home = HomePage(this, app.helix, app.home, avatars, app.snapshot)
+        home = HomePage(this, app.helix, app.home, avatars, app.snapshot, app.pins)
         browse = BrowsePage(this, scope, app.helix, avatars)
-        following = FollowingPage(this, scope, app.helix, app.following, avatars, ::requireLogin) { tabId ->
+        following = FollowingPage(this, scope, app.helix, app.following, avatars, app.pins, ::requireLogin) { tabId ->
             findViewById<View>(R.id.nav_following).nextFocusRightId = tabId
         }
         search = SearchPage(this, scope, app.helix, app.snapshot, RecentSearches(getSharedPreferences(SEARCH_PREFS, MODE_PRIVATE)))
@@ -71,11 +74,19 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
-        if (followRevision != app.followChanges.revision) {
+        val followChanged = followRevision != app.followChanges.revision
+        if (followChanged) {
             followRevision = app.followChanges.revision
             loadedAtMs = 0
         }
         following.bindAccount(app.tokens.userId)
+        home.clearPreviousAccount(app.tokens.userId)
+        val pinsChanged = pinRevision != app.pins.revisions.value
+        following.onReturn(pinsChanged, followChanged)
+        if (pinsChanged) {
+            pinRevision = app.pins.revisions.value
+            home.applyPins(app.tokens.userId)
+        }
         if (screen == Screen.FOLLOWING) following.show()
         when {
             awaitingLogin -> Unit
@@ -91,10 +102,20 @@ class MainActivity : Activity() {
                 if (!awaitingLogin && app.tokens.accessToken != null) load()
             }
         }
+        pinUpdates = scope.launch {
+            app.pins.revisions.collect { revision ->
+                if (revision == pinRevision) return@collect
+                pinRevision = revision
+                following.applyPins()
+                home.applyPins(app.tokens.userId)
+            }
+        }
     }
 
     override fun onStop() {
         followUpdates?.cancel()
+        pinUpdates?.cancel()
+        following.cancelPinMove(restoreFocus = false)
         home.stop()
         super.onStop()
     }
@@ -116,6 +137,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Back handling of the platform Activity")
     override fun onBackPressed() {
+        if (screen == Screen.FOLLOWING && following.cancelPinMove()) return
         when (backAction(screen, home.isAtTop())) {
             BackAction.GO_HOME -> {
                 showScreen(Screen.HOME)
@@ -130,7 +152,13 @@ class MainActivity : Activity() {
         }
     }
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (screen == Screen.FOLLOWING && following.handlePinMoveKey(event)) return true
+        return super.dispatchKeyEvent(event)
+    }
+
     fun showScreen(screen: Screen) {
+        if (this.screen == Screen.FOLLOWING) following.cancelPinMove(restoreFocus = false)
         this.screen = screen
         rail.select(screen)
         content.removeAllViews()
@@ -166,6 +194,7 @@ class MainActivity : Activity() {
                 me = user
                 app.tokens.userId = user.id
                 following.bindAccount(user.id)
+                home.clearPreviousAccount(user.id)
                 app.snapshot.meAvatar = user.profileImageUrl
                 rail.setAvatar(user.profileImageUrl)
                 home.load(user.id)
@@ -180,8 +209,10 @@ class MainActivity : Activity() {
     }
 
     private fun logout() {
+        homeLoad?.cancel()
         app.tokens.clearLogin()
         following.bindAccount(null)
+        home.clearPreviousAccount(null)
         me = null
         loadedAtMs = 0
         showScreen(Screen.HOME)

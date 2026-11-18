@@ -7,6 +7,7 @@ import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.PrefsTokenStore
 import com.purpletv.auth.TokenStore
 import com.purpletv.home.HomeSnapshot
+import com.purpletv.home.PinStore
 import com.purpletv.net.DebugMode
 import com.purpletv.net.Http
 import com.purpletv.player.PlayerPrefs
@@ -32,6 +33,7 @@ class PurpleApp : Application(), ImageLoaderFactory {
     lateinit var home: HomeApi
     lateinit var following: FollowingApi
     lateinit var follows: FollowApi
+    lateinit var pins: PinStore
     val followChanges = FollowChanges()
     lateinit var recordedPlayback: RecordedPlaybackApi
     lateinit var auth: DeviceAuth
@@ -53,7 +55,8 @@ class PurpleApp : Application(), ImageLoaderFactory {
         helix = HelixClient(http, tokens, auth)
         val gql = TwitchGraphQl(http, auth)
         following = FollowingApi(gql)
-        follows = FollowApi(gql, followChanges)
+        pins = PinStore(getSharedPreferences("favourite_pins", MODE_PRIVATE))
+        follows = FollowApi(gql, followChanges, pins::remove)
         recordedPlayback = RecordedPlaybackApi(http, gql)
         playerPrefs = PlayerPrefs(getSharedPreferences("player", MODE_PRIVATE))
     }

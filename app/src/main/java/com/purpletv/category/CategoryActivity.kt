@@ -21,6 +21,7 @@ import com.purpletv.twitch.collectPages
 import com.purpletv.twitch.sized
 import com.purpletv.ui.AvatarCache
 import com.purpletv.ui.FollowButton
+import com.purpletv.ui.PinButton
 import com.purpletv.ui.GridAdapter
 import com.purpletv.ui.Nav
 import com.purpletv.ui.NavRail
@@ -52,7 +53,9 @@ class CategoryActivity : Activity() {
         val categoryId = intent.getStringExtra(EXTRA_ID).orEmpty()
         val name = intent.getStringExtra(EXTRA_NAME).orEmpty()
         val followView = findViewById<View>(R.id.category_follow)
-        FollowButton(followView, scope, app.follows, { app.tokens.userId }, ::requireLogin)
+        val pinView = findViewById<TextView>(R.id.category_pin)
+        FollowButton(followView, scope, app.follows, { app.tokens.userId }, ::requireLogin,
+            pinButton = PinButton(pinView, followView, app.pins) { app.tokens.userId })
             .bind(FollowKind.CATEGORY, categoryId, name)
         findViewById<TextView>(R.id.category_name).text = name
         findViewById<View>(R.id.category_art_frame).clipToOutline = true
@@ -93,7 +96,7 @@ class CategoryActivity : Activity() {
             if (first && items.isNotEmpty()) {
                 first = false
                 grid.post {
-                    if (!followView.hasFocus()) grid.layoutManager?.findViewByPosition(0)?.requestFocus()
+                    if (!followView.hasFocus() && !pinView.hasFocus()) grid.layoutManager?.findViewByPosition(0)?.requestFocus()
                 }
             }
             scope.launch { runCatching { avatars.urls(items.map { it.userId }) }.getOrNull()?.let { adapter.avatars = it } }

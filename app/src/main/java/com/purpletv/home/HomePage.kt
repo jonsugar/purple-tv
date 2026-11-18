@@ -16,6 +16,7 @@ import coil.load
 import coil.transform.CircleCropTransformation
 import com.purpletv.R
 import com.purpletv.player.ZapList
+import com.purpletv.twitch.FollowKind
 import com.purpletv.twitch.HelixClient
 import com.purpletv.twitch.HomeApi
 import com.purpletv.twitch.NotLoggedInException
@@ -41,6 +42,7 @@ class HomePage(
     private val homeApi: HomeApi,
     private val avatars: AvatarCache,
     private val snapshot: HomeSnapshot,
+    private val pins: PinStore,
 ) {
     val view: View = LayoutInflater.from(context).inflate(R.layout.page_home, null)
 
@@ -55,6 +57,8 @@ class HomePage(
     private val hero = Hero()
     private var focusedRow = -1
     private var onFirstCard = true
+    private var sourceRows = emptyList<HomeRow>()
+    private var rowsAccount: String? = null
 
     init {
         rows.layoutManager = rowsLayout
@@ -83,7 +87,9 @@ class HomePage(
             context.getString(R.string.row_followed), RowKind.STREAMS,
             followedResult.map { list -> list.map { RowItem.StreamItem(it) } }, emptyText = R.string.followed_empty,
         )
-        adapter.submit(listOf(followed) + lower)
+        sourceRows = listOf(followed) + lower
+        rowsAccount = userId
+        adapter.submit(withChannelPins(sourceRows, pins.list(userId, FollowKind.CHANNEL)))
         adapter.warmUp(rows)
         focusedRow = -1
         rows.scrollToPosition(0)
@@ -94,7 +100,10 @@ class HomePage(
             .flatMap { row -> row.items.getOrDefault(emptyList()).mapNotNull { (it as? RowItem.StreamItem)?.stream?.userId } }
         val urls = runCatching { avatars.urls(bareIds) }.getOrDefault(emptyMap())
         coroutineContext.ensureActive()
-        if (urls.isNotEmpty()) adapter.addAvatars(urls)
+        if (urls.isNotEmpty()) {
+            sourceRows = sourceRows.map { if (it.avatars.isEmpty()) it.copy(avatars = urls) else it }
+            adapter.addAvatars(urls)
+        }
         hero.refresh()
 
         snapshot.followedLive = followedResult.getOrDefault(emptyList())
@@ -107,7 +116,23 @@ class HomePage(
     }
 
     fun showError() {
+        sourceRows = emptyList()
+        rowsAccount = null
         adapter.submit(listOf(HomeRow(context.getString(R.string.row_followed), RowKind.STREAMS, Result.failure(RuntimeException()))))
+    }
+
+    fun applyPins(account: String?) {
+        if (rowsAccount != account || sourceRows.isEmpty()) return
+        val pinnedRows = withChannelPins(sourceRows, pins.list(account, FollowKind.CHANNEL))
+        if (pinnedRows != adapter.rows) adapter.submit(pinnedRows)
+    }
+
+    fun clearPreviousAccount(account: String?) {
+        if (rowsAccount == null || rowsAccount == account) return
+        rowsAccount = null
+        sourceRows = emptyList()
+        hero.cancel()
+        adapter.submit(skeletonRows())
     }
 
     /** Whether Home is at its start: the first card of its top row focused last. */

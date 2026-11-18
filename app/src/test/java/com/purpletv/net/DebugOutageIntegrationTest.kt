@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.net.Uri
 import android.os.Looper
 import android.widget.TextView
+import android.widget.LinearLayout
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSpec
@@ -22,6 +23,7 @@ import com.purpletv.twitch.FollowChanges
 import com.purpletv.twitch.FollowKind
 import com.purpletv.twitch.TwitchGraphQl
 import com.purpletv.ui.FollowButton
+import com.purpletv.ui.PinButton
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -54,16 +56,25 @@ class DebugOutageIntegrationTest {
             val tokens = InMemoryTokenStore().apply { accessToken = "saved"; refreshToken = "refresh"; userId = "42" }
             val auth = DeviceAuth(app.http, "tv", "", tokens, server.url("/oauth2/").toString())
             val changes = FollowChanges()
-            val api = FollowApi(TwitchGraphQl(app.http, auth, server.url("/gql").toString()), changes)
+            val api = FollowApi(TwitchGraphQl(app.http, auth, server.url("/gql").toString()), changes, app.pins::remove)
             val scope = MainScope()
             val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
             val button = TextView(activity)
-            activity.setContentView(button)
+            val pin = TextView(activity)
+            activity.setContentView(LinearLayout(activity).apply { addView(button); addView(pin) })
             try {
                 server.enqueue(MockResponse().setBody("""{"data":{"currentUser":{"followedGames":{"nodes":[{"id":"deadlock"}]}}}}"""))
-                FollowButton(button, scope, api, { tokens.userId }, { fail("Outage must not ask for sign-in") })
+                FollowButton(button, scope, api, { tokens.userId }, { fail("Outage must not ask for sign-in") },
+                    pinButton = PinButton(pin, button, app.pins) { tokens.userId })
                     .bind(FollowKind.CATEGORY, "deadlock", "Deadlock")
                 waitUntil { button.text == app.getString(R.string.following_state) }
+                assertEquals(app.getString(R.string.pin), pin.text)
+                assertTrue(pin.performClick())
+                assertEquals(app.getString(R.string.unpin), pin.text)
+                assertTrue(pin.performClick())
+                assertTrue(app.pins.list(tokens.userId, FollowKind.CATEGORY).isEmpty())
+                assertEquals(app.getString(R.string.following_state), button.text)
+                assertTrue(pin.performClick())
                 assertTrue(button.performClick())
                 val confirmation = ShadowAlertDialog.getLatestAlertDialog()
 
@@ -76,12 +87,15 @@ class DebugOutageIntegrationTest {
                 assertEquals(0L, changes.revision)
                 assertEquals(1, server.requestCount)
                 assertEquals("saved", tokens.accessToken)
+                assertEquals(listOf("deadlock"), app.pins.list(tokens.userId, FollowKind.CATEGORY).map { it.id })
 
                 app.debugMode.setNetworkingDisabled(false)
                 server.enqueue(MockResponse().setBody("""{"data":{"unfollowGame":{"game":{"id":"deadlock"}}}}"""))
                 assertTrue(button.performClick())
                 ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
                 waitUntil { button.text == app.getString(R.string.follow) }
+                assertEquals(android.view.View.GONE, pin.visibility)
+                assertTrue(app.pins.list(tokens.userId, FollowKind.CATEGORY).isEmpty())
                 assertEquals(1L, changes.revision)
                 assertEquals("CategoryFollowState", JSONObject(server.takeRequest(1, SECONDS)!!.body.readUtf8()).getString("operationName"))
                 assertEquals("UnfollowCategory", JSONObject(server.takeRequest(1, SECONDS)!!.body.readUtf8()).getString("operationName"))

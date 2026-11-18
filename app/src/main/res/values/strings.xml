@@ -16,6 +16,14 @@
     <string name="nav_browse">Browse</string>
     <string name="nav_following">Following</string>
     <string name="follow">Follow</string>
+    <string name="pin">Pin</string>
+    <string name="unpin">Unpin</string>
+    <string name="pinned_favourites">Pinned favourites</string>
+    <string name="moving_pinned_channel">Moving %1$s</string>
+    <string name="reorder_pins">Reorder pins</string>
+    <string name="reorder_pick">Select a favourite to move it.</string>
+    <string name="reorder_up">Move up</string>
+    <string name="reorder_down">Move down</string>
     <string name="following_state">Following</string>
     <string name="follow_loading">Checking…</string>
     <string name="follow_retry">Retry follow status</string>
@@ -97,7 +105,7 @@
     <string name="profile_debug">Debug</string>
     <string name="debug_enable">Enable debug mode</string>
     <string name="debug_disable_networking">Disable networking</string>
-    <string name="debug_close">Close</string>
+    <string name="close">Close</string>
     <string name="debug_badge">Debug mode</string>
     <string name="debug_networking_disabled">Networking disabled</string>
     <string name="player_reconnecting">Connection lost, retrying…</string>

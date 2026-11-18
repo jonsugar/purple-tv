@@ -17,6 +17,8 @@ import com.purpletv.twitch.FollowedChannel
 class FollowedChannelsAdapter(
     private val onClick: (FollowedChannel) -> Unit,
     private val onNearEnd: (Int) -> Unit,
+    private val horizontal: Boolean = false,
+    private val onLongClick: ((FollowedChannel) -> Boolean)? = null,
 ) : ListAdapter<FollowedChannel, FollowedChannelsAdapter.Holder>(Diff) {
     class Holder(val card: FollowedChannelCard) : RecyclerView.ViewHolder(card)
 
@@ -37,8 +39,14 @@ class FollowedChannelsAdapter(
     override fun onBindViewHolder(holder: Holder, position: Int) {
         holder.card.bind(getItem(position))
         holder.card.setOnClickListener { onClick(getItem(holder.bindingAdapterPosition.takeIf { it != RecyclerView.NO_POSITION } ?: return@setOnClickListener)) }
-        holder.card.nextFocusLeftId = if (position % 4 == 0) R.id.nav_following else View.NO_ID
-        holder.card.nextFocusUpId = if (position < 4) R.id.following_channels else View.NO_ID
+        onLongClick?.let { move ->
+            holder.card.setOnLongClickListener {
+                val index = holder.bindingAdapterPosition
+                index != RecyclerView.NO_POSITION && move(getItem(index))
+            }
+        }
+        val firstInRow = if (horizontal) position == 0 else position % 4 == 0
+        holder.card.nextFocusLeftId = if (firstInRow) R.id.nav_following else View.NO_ID
         holder.card.post { onNearEnd(position) }
     }
 

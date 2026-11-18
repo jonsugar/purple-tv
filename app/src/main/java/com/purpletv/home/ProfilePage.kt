@@ -67,7 +67,7 @@ class ProfilePage(
 
         val dialog = builder.setTitle(R.string.profile_debug)
             .setView(controls)
-            .setPositiveButton(R.string.debug_close, null)
+            .setPositiveButton(R.string.close, null)
             .create()
         dialog.setOnShowListener { enabled.requestFocus() }
         dialog.setOnDismissListener { anchor.requestFocus() }

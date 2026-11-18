@@ -25,6 +25,7 @@ class FollowButton(
     private val account: () -> String?,
     private val onAuthRequired: () -> Unit,
     private val onLabelChanged: () -> Unit = {},
+    private val pinButton: PinButton? = null,
     private val onConfirmationChanged: (Boolean) -> Unit = {},
 ) {
     private var job: Job? = null
@@ -121,7 +122,8 @@ class FollowButton(
 
     private fun writeFollow(follow: Boolean) {
         val (kind, id) = target ?: return
-        if (boundAccount == null || boundAccount != account()) { onAuthRequired(); return }
+        val owner = boundAccount
+        if (owner == null || owner != account()) { onAuthRequired(); return }
         val request = generation
         busy = true
         render()
@@ -129,7 +131,7 @@ class FollowButton(
             try {
                 if (follow) api.follow(kind, id)
                 // The write may already have reached Twitch when the viewer leaves this screen.
-                else withContext(NonCancellable) { api.unfollow(kind, id) }
+                else withContext(NonCancellable) { api.unfollow(kind, id, owner) }
                 ensureActive()
                 if (request != generation || boundAccount != account()) return@launch
                 following = follow
@@ -156,6 +158,7 @@ class FollowButton(
         view.alpha = if (busy || target == null) 0.5f else 1f
         (view as? TextView)?.text = label
         (view as? ImageView)?.setImageResource(if (following) R.drawable.ic_followed else R.drawable.ic_following)
+        pinButton?.bind(target, targetName, known && following && boundAccount == account(), busy)
         onLabelChanged()
     }
 }

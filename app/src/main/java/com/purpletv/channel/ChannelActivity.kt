@@ -20,6 +20,7 @@ import com.purpletv.twitch.FollowKind
 import com.purpletv.ui.FollowButton
 import com.purpletv.ui.Nav
 import com.purpletv.ui.NavRail
+import com.purpletv.ui.PinButton
 import com.purpletv.ui.RecordingRow
 import com.purpletv.ui.viewersText
 import kotlinx.coroutines.Job
@@ -47,7 +48,9 @@ class ChannelActivity : Activity() {
         super.onCreate(savedInstanceState)
         account = app.tokens.userId
         setContentView(R.layout.activity_channel)
-        followButton = FollowButton(findViewById(R.id.channel_follow), scope, app.follows, { app.tokens.userId }, ::requireLogin)
+        val followView = findViewById<View>(R.id.channel_follow)
+        followButton = FollowButton(followView, scope, app.follows, { app.tokens.userId }, ::requireLogin,
+            pinButton = PinButton(findViewById(R.id.channel_pin), followView, app.pins) { app.tokens.userId })
         val rail = NavRail(findViewById(R.id.nav_rail), ::openMain)
         rail.select(Screen.FOLLOWING)
         app.snapshot.meAvatar?.let(rail::setAvatar)

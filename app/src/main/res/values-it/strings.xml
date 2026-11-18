@@ -14,6 +14,14 @@
     <string name="nav_browse">Sfoglia</string>
     <string name="nav_following">Seguiti</string>
     <string name="follow">Segui</string>
+    <string name="pin">Aggiungi ai preferiti</string>
+    <string name="unpin">Rimuovi dai preferiti</string>
+    <string name="pinned_favourites">Preferiti</string>
+    <string name="moving_pinned_channel">Spostamento di %1$s</string>
+    <string name="reorder_pins">Riordina preferiti</string>
+    <string name="reorder_pick">Seleziona un preferito da spostare.</string>
+    <string name="reorder_up">Sposta su</string>
+    <string name="reorder_down">Sposta giù</string>
     <string name="following_state">Seguito</string>
     <string name="follow_loading">Verifica…</string>
     <string name="follow_retry">Riprova a verificare lo stato</string>
@@ -95,7 +103,7 @@
     <string name="profile_debug">Debug</string>
     <string name="debug_enable">Abilita la modalità debug</string>
     <string name="debug_disable_networking">Disattiva la rete</string>
-    <string name="debug_close">Chiudi</string>
+    <string name="close">Chiudi</string>
     <string name="debug_badge">Modalità debug</string>
     <string name="debug_networking_disabled">Rete disattivata</string>
     <string name="player_reconnecting">Connessione persa, riprovo…</string>

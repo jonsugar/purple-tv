@@ -32,7 +32,7 @@ class HelixClient(
         HelixParser.users(get("users", listOf("login" to login.trim().lowercase()))).firstOrNull()
 
     suspend fun followedStreams(userId: String): List<Stream> =
-        HelixParser.streams(get("streams/followed", listOf("user_id" to userId, "first" to "100"))).items
+        collectPages(key = Stream::userId) { followedStreamsPage(userId, it) }
 
     suspend fun followedStreamsPage(userId: String, cursor: String? = null): Page<Stream> =
         HelixParser.streams(get("streams/followed", listOfNotNull("user_id" to userId, "first" to "100", cursor?.let { "after" to it })))

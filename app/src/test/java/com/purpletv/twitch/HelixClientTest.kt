@@ -53,6 +53,17 @@ class HelixClientTest {
     }
 
     @Test
+    fun followedStreamsFindsChannelsOnLaterPagesAndOmitsDuplicates() = runTest {
+        val paged = org.json.JSONObject(oneStream).put("pagination", org.json.JSONObject().put("cursor", "next"))
+        server.enqueue(MockResponse().setBody(paged.toString()))
+        server.enqueue(MockResponse().setBody(oneStream.replace("\"data\":[", "\"data\":[{\"user_id\":\"2\"},")))
+
+        assertEquals(listOf("1", "2"), helix.followedStreams("42").map { it.userId })
+        server.takeRequest()
+        assertEquals("next", server.takeRequest().requestUrl!!.queryParameter("after"))
+    }
+
+    @Test
     fun usersBatchesIds() = runTest {
         server.enqueue(MockResponse().setBody("""{"data":[]}"""))
         helix.users(listOf("1", "2"))

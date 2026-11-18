@@ -29,6 +29,8 @@
                         android:text="@string/watch_live" android:visibility="gone" />
                     <TextView android:id="@+id/channel_follow" style="@style/Tab" android:layout_marginStart="8dp"
                         android:text="@string/follow_loading" />
+                    <TextView android:id="@+id/channel_pin" style="@style/Tab" android:layout_marginStart="8dp"
+                        android:text="@string/pin" android:visibility="gone" />
                 </LinearLayout>
                 <TextView android:id="@+id/channel_status" android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:layout_marginStart="10dp" android:layout_marginTop="12dp" android:textSize="11sp" android:textColor="@color/text_secondary" android:text="@string/loading" />

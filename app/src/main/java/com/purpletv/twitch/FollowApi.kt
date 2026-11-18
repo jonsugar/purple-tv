@@ -18,7 +18,11 @@ class FollowChanges {
 }
 
 /** Follows use the same internal API and signed-in TV client as playback and categories. */
-class FollowApi(private val gql: TwitchGraphQl, private val changes: FollowChanges) {
+class FollowApi(
+    private val gql: TwitchGraphQl,
+    private val changes: FollowChanges,
+    private val onUnfollowed: (String?, FollowKind, String) -> Unit = { _, _, _ -> },
+) {
     private val unfollowRequest = Mutex()
 
     suspend fun isFollowing(kind: FollowKind, id: String): Boolean = when (kind) {
@@ -56,11 +60,12 @@ class FollowApi(private val gql: TwitchGraphQl, private val changes: FollowChang
         changes.changed()
     }
 
-    suspend fun unfollow(kind: FollowKind, id: String) {
+    suspend fun unfollow(kind: FollowKind, id: String, accountId: String? = null) {
         if (id.isBlank()) throw IOException("Missing unfollow target")
         if (!unfollowRequest.tryLock()) throw IOException("Another unfollow is in progress")
         try {
             requestUnfollow(kind, id)
+            onUnfollowed(accountId, kind, id)
             changes.changed()
         } finally {
             unfollowRequest.unlock()
