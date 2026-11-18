@@ -5,8 +5,7 @@
     <include android:id="@+id/following_pinned" layout="@layout/view_row"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginStart="-6dp" />
-    <TextView android:id="@+id/following_regular_heading"
+    <include android:id="@+id/following_regular_heading" layout="@layout/view_following_heading"
         android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:layout_marginStart="4dp" android:layout_marginTop="4dp"
-        android:textSize="12sp" android:fontFamily="@font/inter_semibold" />
+        android:layout_marginStart="4dp" android:layout_marginTop="4dp" />
 </LinearLayout>

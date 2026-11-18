@@ -45,6 +45,7 @@ object Nav {
 
     fun openChannel(context: Context, channel: FollowedChannel) {
         context.startActivity(Intent(context, ChannelActivity::class.java)
+            .putExtra(ChannelActivity.EXTRA_ID, channel.id)
             .putExtra(ChannelActivity.EXTRA_LOGIN, channel.login))
     }
 

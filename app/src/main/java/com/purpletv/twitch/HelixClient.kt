@@ -55,9 +55,9 @@ class HelixClient(
     suspend fun streamByLogin(login: String): Stream? =
         HelixParser.streams(get("streams", listOf("user_login" to login.trim().lowercase()))).items.firstOrNull()
 
-    /** Live metadata for Home recommendations, whose shelves don't supply the stream language. */
+    /** Live streams and their language for a set of channel IDs. */
     suspend fun streamsByUserIds(ids: List<String>): List<Stream> = ids.distinct().chunked(MAX_IDS).flatMap { chunk ->
-        HelixParser.streams(get("streams", chunk.map { "user_id" to it })).items
+        HelixParser.streams(get("streams", listOf("first" to chunk.size.toString()) + chunk.map { "user_id" to it })).items
     }
 
     suspend fun topStreams(gameId: String? = null, cursor: String? = null, language: StreamLanguage = StreamLanguage.ALL): Page<Stream> =

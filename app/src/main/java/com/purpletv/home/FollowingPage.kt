@@ -16,6 +16,7 @@ import com.purpletv.twitch.FollowingApi
 import com.purpletv.twitch.HelixClient
 import com.purpletv.twitch.NotLoggedInException
 import com.purpletv.twitch.Stream
+import com.purpletv.twitch.User
 import com.purpletv.twitch.Category
 import com.purpletv.twitch.Page
 import com.purpletv.ui.AvatarCache
@@ -43,6 +44,7 @@ class FollowingPage(
     private val avatars: AvatarCache,
     private val pins: PinStore,
     private val streamPrefs: StreamPreferences,
+    private val ghostFollows: GhostFollowStore,
     private val onAuthRequired: () -> Unit,
     private val onTabSelected: (Int) -> Unit = {},
 ) {
@@ -55,13 +57,19 @@ class FollowingPage(
     private var channelJob: Job? = null
     private var profileJob: Job? = null
     private var liveStatusJob: Job? = null
+    private var ghostLiveJob: Job? = null
     private var channels = emptyList<FollowedChannel>()
     private var liveItems = emptyList<Stream>()
     private var categoryItems = emptyList<Category>()
     private var orderedLive = emptyList<Stream>()
+    private var ghostLive = emptyList<Stream>()
+    private var ghostLiveLoadedAt = 0L
+    private var ghostLiveFailed = false
+    private var orderedGhostLive = emptyList<Stream>()
     private var openedItem: Pair<FollowKind, String>? = null
     private var channelMove: ChannelMove? = null
     private val profileIds = mutableSetOf<String>()
+    private val profilesById = mutableMapOf<String, User>()
     private var profilesWanted = 0
     private var profilesFailed = false
     private var channelsLoaded = false
@@ -72,9 +80,13 @@ class FollowingPage(
     private var channelsLoadedAt = 0L
     private var followRevision = PurpleApp.instance.followChanges.revision
 
-    private val livePage: ContentGrid = ContentGrid(context, R.string.followed_empty) { live.loadMore() }
+    private val livePage: ContentGrid = ContentGrid(context, R.string.followed_empty) {
+        if (!live.hasLoaded || live.hasFailed) live.loadMore()
+        if (ghostLiveFailed) refreshGhostLive()
+    }
     private val categoryPage: ContentGrid = ContentGrid(context, R.string.following_categories_empty) { categories.loadMore() }
     private val channelPage: ContentGrid = ContentGrid(context, R.string.following_channels_empty) {
+        if (ghostLiveFailed) refreshGhostLive()
         if (!channelsLoaded || channelListFailed) loadChannels() else {
             if (profilesFailed) { profilesFailed = false; ensureProfiles(profilesWanted) }
             if (liveStatusFailed) refreshChannelLive()
@@ -84,10 +96,12 @@ class FollowingPage(
 
     private val liveAdapter = GridAdapter(4, ::openStream) {}
     private val pinnedLive = RowAdapter(::openStream)
+    private val ghostLiveCards = GridAdapter(4, ::openGhostStream) {}
     private val categoryAdapter = GridAdapter(7, ::openCategory) {}
     private val pinnedCategories = RowAdapter(::openCategory)
     private val channelAdapter = FollowedChannelsAdapter(::openChannel, ::ensureProfiles)
     private val pinnedChannels = FollowedChannelsAdapter(::openPinnedChannel, {}, horizontal = true, onLongClick = ::startPinMove)
+    private val ghostChannelCards = FollowedChannelsAdapter(::openChannel, {})
     private val liveSections: FollowingSections
     private val categorySections: FollowingSections
     private val channelSections: FollowingSections
@@ -120,9 +134,11 @@ class FollowingPage(
         liveAdapter.attachTo(livePage.grid)
         categoryAdapter.attachTo(categoryPage.grid)
         channelAdapter.attachTo(channelPage.grid)
-        liveSections = FollowingSections(context, livePage.grid, R.string.row_followed, RowKind.STREAMS, pinnedLive)
+        liveSections = FollowingSections(context, livePage.grid, R.string.row_followed, RowKind.STREAMS, pinnedLive,
+            ghostLiveCards, R.string.ghost_follows_live)
         categorySections = FollowingSections(context, categoryPage.grid, R.string.following_live_categories, RowKind.CATEGORIES, pinnedCategories)
-        channelSections = FollowingSections(context, channelPage.grid, R.string.following_followed_channels, RowKind.CHANNELS, pinnedChannels)
+        channelSections = FollowingSections(context, channelPage.grid, R.string.following_followed_channels, RowKind.CHANNELS,
+            pinnedChannels, ghostChannelCards, R.string.ghost_follows)
         tabs.forEachIndexed { index, tab ->
             tab.setOnClickListener { select(index) }
             tab.nextFocusLeftId = if (index == 0) R.id.nav_following else tabs[index - 1].id
@@ -147,7 +163,9 @@ class FollowingPage(
         channelJob?.cancel()
         profileJob?.cancel()
         liveStatusJob?.cancel()
+        ghostLiveJob?.cancel()
         profileIds.clear()
+        profilesById.clear()
         profilesWanted = 0
         profilesFailed = false
         channelsLoaded = false
@@ -160,15 +178,22 @@ class FollowingPage(
         liveItems = emptyList()
         categoryItems = emptyList()
         orderedLive = emptyList()
+        ghostLive = emptyList()
+        ghostLiveLoadedAt = 0L
+        ghostLiveFailed = false
+        orderedGhostLive = emptyList()
         openedItem = null
         liveAdapter.submitList(null)
         pinnedLive.submitList(null)
         liveAdapter.avatars = emptyMap()
         pinnedLive.avatars = emptyMap()
+        ghostLiveCards.submitList(null)
+        ghostLiveCards.avatars = emptyMap()
         categoryAdapter.submitList(null)
         pinnedCategories.submitList(null)
         channelAdapter.submitList(null)
         pinnedChannels.submitList(null)
+        ghostChannelCards.submitList(null)
         applyPins()
         pages.forEach { it.grid.scrollToPosition(0); it.loading() }
         select(0)
@@ -200,10 +225,14 @@ class FollowingPage(
         loadSelected()
     }
 
-    fun onReturn(pinsChanged: Boolean, followChanged: Boolean) {
+    fun onReturn(pinsChanged: Boolean, followChanged: Boolean, ghostsChanged: Boolean) {
         val item = openedItem
         openedItem = null
-        if (pinsChanged) applyPins(if (followChanged) null else item)
+        if (ghostsChanged) {
+            ghostLiveJob?.cancel()
+            ghostLiveLoadedAt = 0L
+        }
+        if (pinsChanged || ghostsChanged) applyPins(if (followChanged) null else item)
     }
 
     fun applyPins(restoreItem: Pair<FollowKind, String>? = null) {
@@ -227,6 +256,13 @@ class FollowingPage(
         val stream = item.stream
         Nav.openStream(context, stream.login, stream, liveAdapter.avatars[stream.userId],
             ZapList(context.getString(R.string.row_followed), orderedLive))
+    }
+
+    private fun openGhostStream(item: RowItem) {
+        if (item !is RowItem.StreamItem) return
+        val stream = item.stream
+        Nav.openStream(context, stream.login, stream, ghostLiveCards.avatars[stream.userId],
+            ZapList(context.getString(R.string.ghost_follows_live), orderedGhostLive))
     }
 
     private fun openCategory(item: RowItem) {
@@ -304,10 +340,14 @@ class FollowingPage(
         val language = streamPrefs.language.value
         val (pinned, regular) = splitByPins(language.filter(liveItems), pins.list(account, FollowKind.CHANNEL), Stream::userId)
         orderedLive = pinned + regular
+        orderedGhostLive = if (live.hasLoaded && !live.hasFailed)
+            ghostOnlyStreams(ghostLive, ghostFollows.ids(account), liveItems, language) else emptyList()
         pinnedLive.submitList(pinned.map { RowItem.StreamItem(it) })
         liveAdapter.submitList(regular.map { RowItem.StreamItem(it) })
-        liveSections.show(pinned.size, regular.size)
-        if (live.hasLoaded) livePage.show(orderedLive.size, live.hasFailed, language.emptyMessage(R.string.followed_empty))
+        ghostLiveCards.submitList(orderedGhostLive.map { RowItem.StreamItem(it) })
+        liveSections.show(pinned.size, regular.size, orderedGhostLive.size)
+        if (live.hasLoaded) livePage.show(orderedLive.size + orderedGhostLive.size, live.hasFailed || ghostLiveFailed,
+            language.emptyMessage(R.string.followed_empty))
     }
 
     fun refreshLanguage() = renderLive()
@@ -333,9 +373,20 @@ class FollowingPage(
 
     private fun channelGroups() = splitByPins(channels, channelPins(), FollowedChannel::id)
 
+    private fun ghostDirectory(): List<FollowedChannel> {
+        if (!channelsLoaded) return emptyList()
+        return ghostOnlyChannels(ghostFollows.list(account).map { it.channel().withProfile() }, channels, ghostLive)
+    }
+
+    private fun FollowedChannel.withProfile(): FollowedChannel = profilesById[id]?.let {
+        copy(login = it.login, displayName = it.displayName.ifBlank { it.login },
+            avatarUrl = it.profileImageUrl, backgroundUrl = it.offlineImageUrl)
+    } ?: this
+
     private fun renderChannels(restore: String? = null, focusPin: String? = channelMove?.id) {
         val (pinned, regular) = channelGroups()
-        channelSections.show(pinned.size, regular.size)
+        val ghosts = ghostDirectory()
+        channelSections.show(pinned.size, regular.size, ghosts.size)
         val movedToPins = restore != null && pinnedChannels.currentList.none { it.id == restore }
         val movedToRegular = restore != null && channelAdapter.currentList.none { it.id == restore }
         pinnedChannels.submitList(pinned) {
@@ -344,6 +395,18 @@ class FollowingPage(
         }
         channelAdapter.submitList(regular) {
             if (movedToRegular) regular.indexOfFirst { it.id == restore }.takeIf { it >= 0 }?.let(channelSections::focusRegular)
+        }
+        val oldGhostIndex = ghostChannelCards.currentList.indexOfFirst { it.id == restore }
+        ghostChannelCards.submitList(ghosts) {
+            if (oldGhostIndex >= 0 && ghosts.none { it.id == restore } &&
+                pinned.none { it.id == restore } && regular.none { it.id == restore } && channelPage.grid.isAttachedToWindow) {
+                when {
+                    ghosts.isNotEmpty() -> channelSections.focusGhost(oldGhostIndex.coerceAtMost(ghosts.lastIndex))
+                    regular.isNotEmpty() -> channelSections.focusRegular(regular.lastIndex)
+                    pinned.isNotEmpty() -> channelSections.focusPinned(pinned.lastIndex)
+                    else -> tabs[2].requestFocus()
+                }
+            }
         }
     }
 
@@ -357,6 +420,7 @@ class FollowingPage(
     private fun loadSelected() {
         if (account == null) return
         val now = SystemClock.elapsedRealtime()
+        if (selected != 1 && homeIsStale(ghostLiveLoadedAt, now)) refreshGhostLive()
         when (selected) {
             0 -> {
                 if (live.hasLoaded && liveLoadedAt > 0 && now - liveLoadedAt >= HOME_MAX_AGE_MS) live.reset()
@@ -380,9 +444,7 @@ class FollowingPage(
                 ensureActive()
                 if (id != account) return@launch
                 val existing = channels.associateBy { it.id }
-                channels = followed.map { channel -> existing[channel.id]?.let {
-                    channel.copy(avatarUrl = it.avatarUrl, backgroundUrl = it.backgroundUrl, live = it.live)
-                } ?: channel }
+                channels = followed.map { it.withProfile().copy(live = existing[it.id]?.live) }
                 channelsLoaded = true
                 channelListFailed = false
                 channelsLoadedAt = SystemClock.elapsedRealtime()
@@ -392,7 +454,7 @@ class FollowingPage(
                 refreshChannelLive()
             } catch (e: IOException) {
                 channelListFailed = true
-                channelPage.show(channels.size, true)
+                showChannelStatus()
                 if (e is NotLoggedInException) onAuthRequired()
             }
         }
@@ -407,28 +469,57 @@ class FollowingPage(
             try {
                 while (true) {
                     val (pinned, regular) = channelGroups()
-                    val missing = (pinned + regular.take(profilesWanted)).asSequence()
+                    val missing = (pinned + regular.take(profilesWanted) + ghostDirectory()).asSequence()
                         .map { it.id }.filter { it !in profileIds }.take(100).toList()
                     if (missing.isEmpty()) break
-                    val profiles = helix.users(missing).associateBy { it.id }
+                    val profiles = helix.users(missing).associateBy(User::id)
                     ensureActive()
                     if (account != id) return@launch
                     profileIds.addAll(missing)
-                    channels = channels.map { channel -> profiles[channel.id]?.let {
-                        channel.copy(avatarUrl = it.profileImageUrl, backgroundUrl = it.offlineImageUrl)
-                    } ?: channel }
+                    profilesById.putAll(profiles)
+                    channels = channels.map { it.withProfile() }
                     renderChannels()
                 }
                 showChannelStatus()
             } catch (e: IOException) {
                 profilesFailed = true
-                channelPage.show(channels.size, true)
+                showChannelStatus()
                 if (e is NotLoggedInException) onAuthRequired()
             }
         }
     }
 
-    private fun showChannelStatus() { channelPage.show(channels.size, channelListFailed || profilesFailed || liveStatusFailed) }
+    private fun showChannelStatus() {
+        channelPage.show(channels.size + ghostDirectory().size,
+            channelListFailed || profilesFailed || liveStatusFailed || ghostLiveFailed)
+    }
+
+    private fun refreshGhostLive() {
+        val owner = account ?: return
+        if (ghostLiveJob?.isActive == true) return
+        ghostLiveJob = scope.launch {
+            try {
+                val streams = helix.streamsByUserIds(ghostFollows.ids(owner))
+                ensureActive()
+                if (account != owner) return@launch
+                ghostLive = streams
+                ghostLiveLoadedAt = SystemClock.elapsedRealtime()
+                ghostLiveFailed = false
+            } catch (_: NotLoggedInException) {
+                onAuthRequired()
+                return@launch
+            } catch (_: IOException) {
+                ghostLiveFailed = true
+            }
+            renderLive()
+            renderChannels()
+            if (channelsLoaded) showChannelStatus()
+            try {
+                val urls = avatars.urls(ghostLive.map(Stream::userId))
+                if (account == owner) ghostLiveCards.avatars = urls
+            } catch (_: IOException) { /* A missing avatar must not hide a stream. */ }
+        }
+    }
 
     private fun refreshChannelLive() {
         val id = account ?: return

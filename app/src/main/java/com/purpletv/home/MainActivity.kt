@@ -40,6 +40,8 @@ class MainActivity : Activity() {
     private var followUpdates: Job? = null
     private var pinUpdates: Job? = null
     private var pinRevision = app.pins.revisions.value
+    private var ghostRevision = app.ghostFollows.revision
+    private var homeGhostLoad: Job? = null
     private var homeLoad: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,11 +49,12 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         content = findViewById(R.id.content)
         val avatars = AvatarCache(app.helix)
-        home = HomePage(this, app.helix, app.home, avatars, app.snapshot, app.pins, app.streamPrefs)
+        home = HomePage(this, app.helix, app.home, avatars, app.snapshot, app.pins, app.streamPrefs, app.ghostFollows)
         browse = BrowsePage(this, scope, app.helix, avatars, app.streamPrefs) { tabId ->
             findViewById<View>(R.id.nav_browse).nextFocusRightId = tabId
         }
-        following = FollowingPage(this, scope, app.helix, app.following, avatars, app.pins, app.streamPrefs, ::requireLogin) { tabId ->
+        following = FollowingPage(this, scope, app.helix, app.following, avatars, app.pins, app.streamPrefs,
+            app.ghostFollows, ::requireLogin) { tabId ->
             findViewById<View>(R.id.nav_following).nextFocusRightId = tabId
         }
         search = SearchPage(this, scope, app.helix, app.snapshot,
@@ -95,7 +98,9 @@ class MainActivity : Activity() {
         following.bindAccount(app.tokens.userId)
         home.clearPreviousAccount(app.tokens.userId)
         val pinsChanged = pinRevision != app.pins.revisions.value
-        following.onReturn(pinsChanged, followChanged)
+        val ghostsChanged = ghostRevision != app.ghostFollows.revision
+        ghostRevision = app.ghostFollows.revision
+        following.onReturn(pinsChanged, followChanged, ghostsChanged)
         if (pinsChanged) {
             pinRevision = app.pins.revisions.value
             home.applyStreamPreferences(app.tokens.userId)
@@ -106,6 +111,7 @@ class MainActivity : Activity() {
             awaitingLogin -> Unit
             app.tokens.accessToken == null -> { loadedAtMs = 0; login() }
             homeIsStale(loadedAtMs, SystemClock.elapsedRealtime()) -> load()
+            ghostsChanged -> app.tokens.userId?.let(::refreshHomeGhostFollows)
         }
         followUpdates = scope.launch {
             app.followChanges.revisions.collect { revision ->
@@ -212,6 +218,7 @@ class MainActivity : Activity() {
                 app.snapshot.meAvatar = user.profileImageUrl
                 rail.setAvatar(user.profileImageUrl)
                 home.load(user.id)
+                refreshHomeGhostFollows(user.id)
                 search.refreshLiveSuggestions()
             } catch (e: NotLoggedInException) {
                 loadedAtMs = 0
@@ -223,8 +230,14 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun refreshHomeGhostFollows(account: String) {
+        homeGhostLoad?.cancel()
+        homeGhostLoad = scope.launch { home.refreshGhostLive(account) }
+    }
+
     private fun logout() {
         homeLoad?.cancel()
+        homeGhostLoad?.cancel()
         app.tokens.clearLogin()
         following.bindAccount(null)
         home.clearPreviousAccount(null)

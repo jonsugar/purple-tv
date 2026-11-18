@@ -22,22 +22,36 @@ internal class FollowingSections(
     private val heading: Int,
     private val kind: RowKind,
     private val pinnedCards: RecyclerView.Adapter<*>,
+    ghostCards: RecyclerView.Adapter<*>? = null,
+    ghostHeading: Int = 0,
 ) : RecyclerView.Adapter<FollowingSections.Header>() {
     private var showPins = false
     private var showRegular = true
     private var pinnedTitle = context.getString(R.string.pinned_favourites)
     private val layout = grid.layoutManager as GridLayoutManager
+    private val regularCards = checkNotNull(grid.adapter)
+    private val ghostHeader = ghostCards?.let { SectionHeading(ghostHeading) }
 
     init {
-        grid.adapter = ConcatAdapter(this, checkNotNull(grid.adapter))
+        val sections = ConcatAdapter(this, regularCards)
+        if (ghostHeader != null && ghostCards != null) {
+            sections.addAdapter(ghostHeader)
+            sections.addAdapter(ghostCards)
+        }
+        grid.adapter = sections
         layout.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
-            override fun getSpanSize(position: Int) = if (position == 0) layout.spanCount else 1
+            override fun getSpanSize(position: Int): Int {
+                val isHeading = position == 0 ||
+                    (ghostHeader?.itemCount == 1 && position == 1 + regularCards.itemCount)
+                return if (isHeading) layout.spanCount else 1
+            }
         }
     }
 
-    fun show(pinned: Int, regular: Int) {
+    fun show(pinned: Int, regular: Int, ghosts: Int = 0) {
+        ghostHeader?.show(ghosts > 0)
         val pinsVisible = pinned > 0
-        val regularVisible = pinned == 0 || regular > 0
+        val regularVisible = regular > 0 || (pinned == 0 && ghosts == 0)
         if (pinsVisible == showPins && regularVisible == showRegular) return
         val wasAtStart = layout.findFirstVisibleItemPosition() == 0
         showPins = pinsVisible
@@ -64,10 +78,14 @@ internal class FollowingSections(
         notifyItemChanged(0)
     }
 
-    fun focusRegular(position: Int) {
+    fun focusRegular(position: Int) = focusCard(position + 1)
+
+    fun focusGhost(position: Int) = focusCard(position + 2 + regularCards.itemCount)
+
+    private fun focusCard(position: Int) {
         if (!grid.isAttachedToWindow) return
-        grid.scrollToPosition(position + 1)
-        grid.doOnNextLayout { layout.findViewByPosition(position + 1)?.requestFocus() }
+        grid.scrollToPosition(position)
+        grid.doOnNextLayout { layout.findViewByPosition(position)?.requestFocus() }
     }
 
     override fun getItemCount() = 1
@@ -94,5 +112,25 @@ internal class FollowingSections(
         val pinnedTitle: TextView = root.findViewById(R.id.row_title)
         val row: CardRow = root.findViewById(R.id.row_list)
         val heading: TextView = root.findViewById(R.id.following_regular_heading)
+    }
+
+    private class SectionHeading(private val title: Int) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+        private var visible = false
+
+        fun show(show: Boolean) {
+            if (show == visible) return
+            visible = show
+            if (show) notifyItemInserted(0) else notifyItemRemoved(0)
+        }
+
+        override fun getItemCount() = if (visible) 1 else 0
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = object : RecyclerView.ViewHolder(
+            LayoutInflater.from(parent.context).inflate(R.layout.view_following_heading, parent, false),
+        ) {}
+
+        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+            (holder.itemView as TextView).setText(title)
+        }
     }
 }

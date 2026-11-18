@@ -90,8 +90,11 @@ class HelixClientTest {
         assertEquals(listOf("en", "it"), streams.map(Stream::language))
         val first = server.takeRequest().requestUrl!!
         assertEquals("/helix/streams", first.encodedPath)
+        assertEquals("100", first.queryParameter("first"))
         assertEquals(100, first.queryParameterValues("user_id").size)
-        assertEquals(listOf("101"), server.takeRequest().requestUrl!!.queryParameterValues("user_id"))
+        val last = server.takeRequest().requestUrl!!
+        assertEquals("1", last.queryParameter("first"))
+        assertEquals(listOf("101"), last.queryParameterValues("user_id"))
     }
 
     @Test

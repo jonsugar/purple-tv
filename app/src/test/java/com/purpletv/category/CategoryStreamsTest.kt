@@ -32,6 +32,23 @@ class CategoryStreamsTest {
             "game", pins, StreamLanguage.ENGLISH))
     }
 
+    @Test fun ghostsComeAfterTwitchFollowsAndBeforeMorePopularPublicStreamsAcrossPages() {
+        val ghostHigh = stream("ghost-high", 400, "fr")
+        val ghostLow = stream("ghost-low", 1, "en")
+        val ghosts = listOf(ghostLow, ghostHigh, followedLow, pinSecond, stream("elsewhere-ghost", 1000, "en", "other"))
+        val ghostIds = ghosts.mapTo(hashSetOf(), Stream::userId)
+        val extraPins = pins + FavouritePin(ghostLow.userId, ghostLow.displayName)
+        val first = listOf(publicHigh, publicLow)
+        val expected = listOf(pinFirst, pinSecond, followedHigh, followedLow, ghostHigh, ghostLow, publicHigh, publicLow)
+        assertEquals(expected, orderCategoryStreams(first, followed, "game", extraPins, StreamLanguage.ALL, ghosts, ghostIds))
+        assertEquals(expected + unknown, orderCategoryStreams(first + listOf(ghostHigh, ghostLow, followedLow, unknown),
+            followed, "game", extraPins, StreamLanguage.ALL, ghosts, ghostIds))
+        assertEquals(listOf(pinSecond, followedLow, ghostLow, publicLow),
+            orderCategoryStreams(first, followed, "game", extraPins, StreamLanguage.ENGLISH, ghosts, ghostIds))
+        assertEquals(listOf(pinSecond, followedLow, ghostLow, publicLow),
+            orderCategoryStreams(first + ghostLow, followed, "game", extraPins, StreamLanguage.ENGLISH, emptyList(), ghostIds))
+    }
+
     private fun stream(id: String, viewers: Int, language: String, game: String = "game") =
         Stream(id, id, id, "", game, "", viewers, "", language = language)
 }

@@ -30,7 +30,9 @@ import com.purpletv.ui.clear
 import com.purpletv.ui.viewersText
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import java.io.IOException
 
 /**
  * Home like the official TV app, made immersive: the focused card fills the top (the hero), and
@@ -45,6 +47,7 @@ class HomePage(
     private val snapshot: HomeSnapshot,
     private val pins: PinStore,
     private val streamPrefs: StreamPreferences,
+    private val ghostFollows: GhostFollowStore,
 ) {
     val view: View = LayoutInflater.from(context).inflate(R.layout.page_home, null)
 
@@ -61,6 +64,8 @@ class HomePage(
     private var onFirstCard = true
     private var sourceRows = emptyList<HomeRow>()
     private var rowsAccount: String? = null
+    private var ghostLive = emptyList<Stream>()
+    private var ghostAvatars = emptyMap<String, String>()
 
     init {
         rows.layoutManager = rowsLayout
@@ -125,13 +130,38 @@ class HomePage(
         adapter.submit(listOf(HomeRow(context.getString(R.string.row_followed), RowKind.STREAMS, Result.failure(RuntimeException()))))
     }
 
+    /** The local edit is already saved. This only refreshes live metadata on return to Home. */
+    suspend fun refreshGhostLive(account: String) {
+        if (rowsAccount != account) return
+        applyStreamPreferences(account)
+        try {
+            val streams = helix.streamsByUserIds(ghostFollows.ids(account))
+            currentCoroutineContext().ensureActive()
+            if (rowsAccount != account) return
+            ghostLive = streams
+            applyStreamPreferences(account)
+            val urls = avatars.urls(streams.map(Stream::userId))
+            currentCoroutineContext().ensureActive()
+            if (rowsAccount != account) return
+            ghostAvatars = urls
+            applyStreamPreferences(account)
+        } catch (e: IOException) {
+            Log.w(TAG, "could not refresh live ghost follows", e)
+        }
+    }
+
     fun applyStreamPreferences(account: String?) {
         if (rowsAccount != account || sourceRows.isEmpty()) return
-        val matching = filterLiveRows(sourceRows, streamPrefs.language.value)
+        val language = streamPrefs.language.value
+        val matching = filterLiveRows(sourceRows, language)
         val pinnedRows = withChannelPins(matching, pins.list(account, FollowKind.CHANNEL))
-        if (pinnedRows != adapter.rows) {
-            hero.clearMissingCard(pinnedRows)
-            adapter.submit(pinnedRows)
+        val ghostIds = ghostFollows.ids(account).toSet()
+        val followed = sourceRows.first().items.getOrNull()?.filterIsInstance<RowItem.StreamItem>()?.map { it.stream }
+        val ghosts = if (followed == null) emptyList() else ghostOnlyStreams(ghostLive, ghostIds, followed, language)
+        val visible = withGhostFollows(pinnedRows, ghosts, ghostIds, context.getString(R.string.ghost_follows_live), ghostAvatars)
+        if (visible != adapter.rows) {
+            hero.clearMissingCard(visible)
+            adapter.submit(visible)
         }
     }
 
@@ -139,6 +169,8 @@ class HomePage(
         if (rowsAccount == null || rowsAccount == account) return
         rowsAccount = null
         sourceRows = emptyList()
+        ghostLive = emptyList()
+        ghostAvatars = emptyMap()
         hero.cancel()
         adapter.submit(skeletonRows())
     }

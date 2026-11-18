@@ -3,6 +3,7 @@ package com.purpletv.category
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -11,6 +12,7 @@ import com.purpletv.PurpleApp
 import com.purpletv.R
 import com.purpletv.home.MainActivity
 import com.purpletv.home.Screen
+import com.purpletv.home.homeIsStale
 import com.purpletv.home.screenFrom
 import com.purpletv.player.ZapList
 import com.purpletv.twitch.FollowKind
@@ -36,7 +38,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.IOException
 
-/** Pinned and followed streams first, then the category's most watched streams. */
+/** Pinned, Twitch-followed and ghost-followed streams appear before the public list. */
 class CategoryActivity : Activity() {
     private val scope = MainScope()
     private val app get() = PurpleApp.instance
@@ -51,6 +53,10 @@ class CategoryActivity : Activity() {
     private var followedStreams = emptyList<Stream>()
     private var followRevision: Long? = null
     private var followedLoadFailed = false
+    private var ghostStreams = emptyList<Stream>()
+    private var ghostRevision: Long? = null
+    private var ghostLoadedAt = 0L
+    private var ghostLoadFailed = false
     private var followUpdates: Job? = null
     private var avatarLoad: Job? = null
 
@@ -91,7 +97,7 @@ class CategoryActivity : Activity() {
             refreshLanguage()
         }
         results = ContentGrid(findViewById(R.id.category_results), R.string.category_empty) {
-            if (followedLoadFailed) observeFollowChanges()
+            if (followedLoadFailed || ghostLoadFailed) observeFollowChanges()
             if (pager.hasFailed) pager.loadMore()
         }
         val grid = results.grid
@@ -107,8 +113,8 @@ class CategoryActivity : Activity() {
         var first = true
         updateStreams = { topStreams, failed ->
             val items = orderCategoryStreams(topStreams, followedStreams, categoryId,
-                app.pins.list(account, FollowKind.CHANNEL), language)
-            results.show(items.size, failed || followedLoadFailed, language.emptyMessage(R.string.category_empty))
+                app.pins.list(account, FollowKind.CHANNEL), language, ghostStreams, app.ghostFollows.ids(account).toSet())
+            results.show(items.size, failed || followedLoadFailed || ghostLoadFailed, language.emptyMessage(R.string.category_empty))
             adapter.submitList(items.map { RowItem.StreamItem(it) }) {
                 if (first && items.isNotEmpty()) {
                     first = false
@@ -153,6 +159,10 @@ class CategoryActivity : Activity() {
             followedStreams = emptyList()
             followRevision = null
             followedLoadFailed = false
+            ghostStreams = emptyList()
+            ghostRevision = null
+            ghostLoadedAt = 0L
+            ghostLoadFailed = false
             resetStreams()
         }
         refreshLanguage()
@@ -163,8 +173,8 @@ class CategoryActivity : Activity() {
         followUpdates?.cancel()
         followUpdates = scope.launch {
             app.followChanges.revisions.collectLatest { revision ->
+                val owner = account
                 if (revision != followRevision) {
-                    val owner = account
                     try {
                         val streams = if (owner == null) emptyList() else app.helix.followedStreams(owner)
                         ensureActive()
@@ -178,6 +188,23 @@ class CategoryActivity : Activity() {
                     } catch (_: IOException) {
                         // Keep the public list usable and let the viewer retry the followed feed.
                         followedLoadFailed = true
+                    }
+                }
+                val localRevision = app.ghostFollows.revision
+                if (localRevision != ghostRevision || homeIsStale(ghostLoadedAt, SystemClock.elapsedRealtime())) {
+                    try {
+                        val streams = app.helix.streamsByUserIds(app.ghostFollows.ids(owner))
+                        ensureActive()
+                        if (app.tokens.userId != owner) return@collectLatest
+                        ghostStreams = streams
+                        ghostRevision = localRevision
+                        ghostLoadedAt = SystemClock.elapsedRealtime()
+                        ghostLoadFailed = false
+                    } catch (_: NotLoggedInException) {
+                        requireLogin()
+                        return@collectLatest
+                    } catch (_: IOException) {
+                        ghostLoadFailed = true
                     }
                 }
                 if (pager.hasLoaded) updateStreams(pager.currentItems, pager.hasFailed)

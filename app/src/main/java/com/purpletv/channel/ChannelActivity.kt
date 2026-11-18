@@ -18,6 +18,7 @@ import com.purpletv.twitch.Stream
 import com.purpletv.twitch.clipWindow
 import com.purpletv.twitch.FollowKind
 import com.purpletv.ui.FollowButton
+import com.purpletv.ui.GhostFollowButton
 import com.purpletv.ui.Nav
 import com.purpletv.ui.NavRail
 import com.purpletv.ui.PinButton
@@ -35,6 +36,7 @@ class ChannelActivity : Activity() {
     private var account: String? = null
     private var broadcasterId = ""
     private var broadcasterName = ""
+    private var broadcasterLogin = ""
     private var avatar = ""
     private var live: Stream? = null
     private var job: Job? = null
@@ -43,6 +45,7 @@ class ChannelActivity : Activity() {
     private var window = clipWindow(ClipPeriod.WEEK, System.currentTimeMillis())
     private var loaded = false
     private lateinit var followButton: FollowButton
+    private lateinit var ghostButton: GhostFollowButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +54,10 @@ class ChannelActivity : Activity() {
         val followView = findViewById<View>(R.id.channel_follow)
         followButton = FollowButton(followView, scope, app.follows, { app.tokens.userId }, ::requireLogin,
             pinButton = PinButton(findViewById(R.id.channel_pin), followView, app.pins) { app.tokens.userId })
+        val ghostView = findViewById<View>(R.id.channel_ghost_follow)
+        ghostButton = GhostFollowButton(ghostView, app.ghostFollows, { app.tokens.userId })
+        followView.nextFocusRightId = ghostView.id
+        ghostView.nextFocusLeftId = followView.id
         val rail = NavRail(findViewById(R.id.nav_rail), ::openMain)
         rail.select(Screen.FOLLOWING)
         app.snapshot.meAvatar?.let(rail::setAvatar)
@@ -84,6 +91,7 @@ class ChannelActivity : Activity() {
         if (app.tokens.accessToken == null) { requireLogin(); return }
         if (!loaded) load() else {
             followButton.bind(FollowKind.CHANNEL, broadcasterId, broadcasterName)
+            ghostButton.bind(broadcasterId, broadcasterLogin, broadcasterName)
             refreshLive()
         }
     }
@@ -94,11 +102,15 @@ class ChannelActivity : Activity() {
         findViewById<View>(R.id.channel_retry).visibility = View.GONE
         job = scope.launch {
             try {
-                val user = app.helix.userByLogin(intent.getStringExtra(EXTRA_LOGIN).orEmpty())
-                    ?: throw IOException("Channel unavailable")
+                val id = intent.getStringExtra(EXTRA_ID).orEmpty()
+                val user = if (id.isEmpty()) app.helix.userByLogin(intent.getStringExtra(EXTRA_LOGIN).orEmpty())
+                    else app.helix.users(listOf(id)).firstOrNull()
+                if (user == null) throw IOException("Channel unavailable")
                 broadcasterId = user.id
                 broadcasterName = user.displayName.ifBlank { user.login }
+                broadcasterLogin = user.login
                 followButton.bind(FollowKind.CHANNEL, broadcasterId, broadcasterName)
+                ghostButton.bind(broadcasterId, broadcasterLogin, broadcasterName)
                 avatar = user.profileImageUrl
                 findViewById<TextView>(R.id.channel_name).text = user.displayName
                 if (avatar.isNotEmpty()) findViewById<ImageView>(R.id.channel_avatar).load(avatar) { transformations(CircleCropTransformation()) }
@@ -120,7 +132,7 @@ class ChannelActivity : Activity() {
     private fun refreshLive() {
         scope.launch {
             try {
-                live = app.helix.streamByLogin(intent.getStringExtra(EXTRA_LOGIN).orEmpty())
+                live = app.helix.streamByLogin(broadcasterLogin)
                 findViewById<View>(R.id.channel_watch_live).visibility = if (live == null) View.GONE else View.VISIBLE
                 findViewById<TextView>(R.id.channel_state).text = live?.let {
                     listOf(it.gameName, viewersText(it.viewers)).filter(String::isNotEmpty).joinToString(" · ")
@@ -141,5 +153,8 @@ class ChannelActivity : Activity() {
 
     override fun onDestroy() { scope.cancel(); super.onDestroy() }
 
-    companion object { const val EXTRA_LOGIN = "channel_login" }
+    companion object {
+        const val EXTRA_ID = "channel_id"
+        const val EXTRA_LOGIN = "channel_login"
+    }
 }

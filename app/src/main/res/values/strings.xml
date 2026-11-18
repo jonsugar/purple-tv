@@ -34,6 +34,10 @@
     <string name="following_tab_live">Live</string>
     <string name="following_live_categories">Live categories</string>
     <string name="following_followed_channels">Followed channels</string>
+    <string name="ghost_follow">Ghost follow</string>
+    <string name="ghost_unfollow">Remove ghost follow</string>
+    <string name="ghost_follows">Ghost follows</string>
+    <string name="ghost_follows_live">Live ghost follows</string>
     <string name="following_categories_empty">None of your followed categories has live streams</string>
     <string name="following_channels_empty">You are not following any channels</string>
     <string name="loading">Loading…</string>

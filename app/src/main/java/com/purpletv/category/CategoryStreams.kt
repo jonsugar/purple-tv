@@ -11,12 +11,16 @@ internal fun orderCategoryStreams(
     categoryId: String,
     pins: List<FavouritePin>,
     language: StreamLanguage,
+    ghosts: List<Stream> = emptyList(),
+    ghostIds: Set<String> = emptySet(),
 ): List<Stream> {
-    // The followed feed also supplies low-viewer streams before their public page is loaded.
-    val streams = (top + followed.filter { it.gameId == categoryId }).distinctBy(Stream::userId)
+    // The account's feeds also supply low-viewer streams before their public page is loaded.
+    val streams = (top + followed.filter { it.gameId == categoryId } +
+        ghosts.filter { it.gameId == categoryId && it.userId in ghostIds }).distinctBy(Stream::userId)
     val matching = language.filter(streams).sortedByDescending { it.viewers }
     val followedIds = followed.mapTo(hashSetOf(), Stream::userId)
-    val (pinned, rest) = splitByPins(matching, pins, Stream::userId)
+    val (pinned, rest) = splitByPins(matching, pins.filter { it.id in followedIds }, Stream::userId)
     val (otherFollowed, unfollowed) = rest.partition { it.userId in followedIds }
-    return pinned + otherFollowed + unfollowed
+    val (ghostFollowed, regular) = unfollowed.partition { it.userId in ghostIds }
+    return pinned + otherFollowed + ghostFollowed + regular
 }

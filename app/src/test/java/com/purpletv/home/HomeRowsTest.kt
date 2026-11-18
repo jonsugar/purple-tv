@@ -60,4 +60,24 @@ class HomeRowsTest {
         assertEquals(listOf(category, failed), matching.drop(2))
         assertEquals(source, filterLiveRows(source, StreamLanguage.ALL))
     }
+
+    @Test
+    fun insertsGhostRowBelowFollowedAndDeduplicatesBothFromRecommendations() {
+        fun item(id: String) = RowItem.StreamItem(Stream(id, id, id, "", "", "", 0, ""))
+        val both = item("both")
+        val ghost = item("ghost")
+        val recommended = item("recommended")
+        val followed = HomeRow("Followed", RowKind.STREAMS, Result.success(listOf(both)))
+        val duplicate = HomeRow("Duplicate", RowKind.STREAMS, Result.success(listOf(both)))
+        val recommendations = HomeRow("Recommended", RowKind.STREAMS, Result.success(listOf(ghost, recommended)))
+        val rows = listOf(followed, duplicate, recommendations)
+
+        val visible = withGhostFollows(rows, listOf(ghost.stream), setOf("both", "ghost"), "Live ghost follows", emptyMap())
+        assertEquals(listOf("Followed", "Live ghost follows", "Recommended"), visible.map(HomeRow::title))
+        assertEquals(listOf(ghost), visible[1].items.getOrThrow())
+        assertEquals(listOf(recommended), visible[2].items.getOrThrow())
+        assertEquals(listOf(followed, recommendations),
+            withGhostFollows(rows, emptyList(), setOf("both"), "Live ghost follows", emptyMap()))
+        assertEquals(rows, withGhostFollows(rows, emptyList(), emptySet(), "Live ghost follows", emptyMap()))
+    }
 }

@@ -32,6 +32,10 @@
     <string name="following_tab_live">Live</string>
     <string name="following_live_categories">Categorie in diretta</string>
     <string name="following_followed_channels">Canali seguiti</string>
+    <string name="ghost_follow">Segui come fantasma</string>
+    <string name="ghost_unfollow">Rimuovi follow fantasma</string>
+    <string name="ghost_follows">Follow fantasma</string>
+    <string name="ghost_follows_live">Follow fantasma in diretta</string>
     <string name="following_categories_empty">Nessuna categoria seguita ha dirette in corso</string>
     <string name="following_channels_empty">Non segui nessun canale</string>
     <string name="loading">Caricamento…</string>
