@@ -126,6 +126,18 @@ On a followed channel page, a followed category page, and in the live player, ch
 unfollow dialog, Cancel focus, and focus restoration after Cancel or Back. Confirm a removal using
 a test follow and check the Follow control, the affected lists, continued playback, and re-following.
 
+### Debug mode
+
+Open **Profile → Debug** with the remote. Enable debug mode to make **Disable networking**
+available. A bug icon identifies debug mode on each screen, and the label below it lists the active
+flag. The player keeps this indicator visible when its controls hide. Both switches start off when
+the app process starts. Turning debug mode off clears the networking flag.
+
+Use an unloaded Browse tab to check the offline error, then turn the networking flag off and select
+the same tab to retry. The simulation affects Purple TV only and preserves the Twitch sign-in.
+The unit tests use a local server to check blocked requests, interruption of media and chat, and a
+failed Unfollow after the control has already loaded the Following state.
+
 ### Platform notes
 
 - The launcher banner (`res/drawable-nodpi/banner.png`) is generated with

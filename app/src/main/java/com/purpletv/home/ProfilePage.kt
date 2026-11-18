@@ -5,10 +5,12 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ImageView
+import android.widget.Switch
 import android.widget.TextView
 import coil.load
 import coil.transform.CircleCropTransformation
 import com.purpletv.R
+import com.purpletv.net.DebugMode
 import com.purpletv.player.PlayerPrefs
 import com.purpletv.twitch.User
 
@@ -16,6 +18,7 @@ import com.purpletv.twitch.User
 class ProfilePage(
     private val context: Context,
     private val playerPrefs: PlayerPrefs,
+    private val debugMode: DebugMode,
     private val onLogout: () -> Unit,
 ) {
     val view: View = LayoutInflater.from(context).inflate(R.layout.page_profile, null)
@@ -28,6 +31,7 @@ class ProfilePage(
     init {
         avatar.clipToOutline = true
         view.findViewById<View>(R.id.profile_logout).setOnClickListener { confirmLogout() }
+        view.findViewById<View>(R.id.profile_debug).setOnClickListener { openDebug(it) }
         view.findViewById<View>(R.id.profile_quality).setOnClickListener { nextQuality() }
         view.findViewById<View>(R.id.profile_chat).setOnClickListener {
             playerPrefs.chatVisible = !playerPrefs.chatVisible
@@ -35,6 +39,39 @@ class ProfilePage(
         }
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName
         view.findViewById<TextView>(R.id.profile_version).text = context.getString(R.string.app_version, version)
+    }
+
+    private fun openDebug(anchor: View) {
+        val builder = AlertDialog.Builder(context, R.style.PurpleDialog)
+        val controls = LayoutInflater.from(builder.context).inflate(R.layout.dialog_debug, null)
+        val enabled = controls.findViewById<Switch>(R.id.debug_enabled)
+        val offline = controls.findViewById<Switch>(R.id.debug_offline)
+
+        fun showState() {
+            val state = debugMode.state.value
+            enabled.isChecked = state.enabled
+            offline.isChecked = state.networkingDisabled
+            offline.isEnabled = state.enabled
+            offline.isFocusable = state.enabled
+            offline.alpha = if (state.enabled) 1f else 0.45f
+            val next = if (state.enabled) R.id.debug_offline else android.R.id.button1
+            enabled.nextFocusDownId = next
+        }
+
+        showState()
+        enabled.setOnCheckedChangeListener { _, checked ->
+            debugMode.setEnabled(checked)
+            showState()
+        }
+        offline.setOnCheckedChangeListener { _, checked -> debugMode.setNetworkingDisabled(checked) }
+
+        val dialog = builder.setTitle(R.string.profile_debug)
+            .setView(controls)
+            .setPositiveButton(R.string.debug_close, null)
+            .create()
+        dialog.setOnShowListener { enabled.requestFocus() }
+        dialog.setOnDismissListener { anchor.requestFocus() }
+        dialog.show()
     }
 
     fun bind(user: User?) {

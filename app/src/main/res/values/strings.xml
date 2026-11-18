@@ -94,6 +94,12 @@
     <string name="profile_chat_desc">Also opens and closes from the chat button in the player</string>
     <string name="profile_chat_on">Shown</string>
     <string name="profile_chat_off">Hidden</string>
+    <string name="profile_debug">Debug</string>
+    <string name="debug_enable">Enable debug mode</string>
+    <string name="debug_disable_networking">Disable networking</string>
+    <string name="debug_close">Close</string>
+    <string name="debug_badge">Debug mode</string>
+    <string name="debug_networking_disabled">Networking disabled</string>
     <string name="player_reconnecting">Connection lost, retrying…</string>
     <string name="tune_label">Tuning in</string>
     <string name="zap_button">Channels</string>

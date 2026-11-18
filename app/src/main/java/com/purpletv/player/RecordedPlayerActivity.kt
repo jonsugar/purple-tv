@@ -20,12 +20,12 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
 import com.purpletv.PurpleApp
+import com.purpletv.net.Http
 import com.purpletv.R
 import com.purpletv.home.MainActivity
 import com.purpletv.home.Screen
@@ -144,7 +144,7 @@ class RecordedPlayerActivity : Activity() {
         selector = DefaultTrackSelector(this)
         val player = ExoPlayer.Builder(this, FreshDecoderRenderersFactory(this))
             .setTrackSelector(selector!!)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultHttpDataSource.Factory().setUserAgent("PurpleTV")))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(Http.mediaFactory(app.debugMode).setUserAgent("PurpleTV")))
             .setSeekBackIncrementMs(10_000).setSeekForwardIncrementMs(10_000).build()
         exo = player
         playerView.player = player

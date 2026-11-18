@@ -1,0 +1,183 @@
+package com.purpletv.net
+
+import android.app.Activity
+import android.app.AlertDialog
+import android.net.Uri
+import android.os.Looper
+import android.widget.TextView
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSpec
+import coil.request.CachePolicy
+import coil.request.ErrorResult
+import coil.request.ImageRequest
+import coil.request.ImageResult
+import coil.request.SuccessResult
+import com.purpletv.PurpleApp
+import com.purpletv.R
+import com.purpletv.auth.DeviceAuth
+import com.purpletv.auth.InMemoryTokenStore
+import com.purpletv.twitch.FollowApi
+import com.purpletv.twitch.FollowChanges
+import com.purpletv.twitch.FollowKind
+import com.purpletv.twitch.TwitchGraphQl
+import com.purpletv.ui.FollowButton
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import okio.Buffer
+import org.json.JSONObject
+import org.junit.Assert.*
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.Robolectric
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowAlertDialog
+import org.robolectric.shadows.ShadowToast
+import java.io.File
+import java.io.IOException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit.SECONDS
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class DebugOutageIntegrationTest {
+    @Test
+    fun unfollowFailsAfterFollowingWasReadAndSameControlCanRetry() {
+        MockWebServer().use { server ->
+            val app = RuntimeEnvironment.getApplication() as PurpleApp
+            val tokens = InMemoryTokenStore().apply { accessToken = "saved"; refreshToken = "refresh"; userId = "42" }
+            val auth = DeviceAuth(app.http, "tv", "", tokens, server.url("/oauth2/").toString())
+            val changes = FollowChanges()
+            val api = FollowApi(TwitchGraphQl(app.http, auth, server.url("/gql").toString()), changes)
+            val scope = MainScope()
+            val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+            val button = TextView(activity)
+            activity.setContentView(button)
+            try {
+                server.enqueue(MockResponse().setBody("""{"data":{"currentUser":{"followedGames":{"nodes":[{"id":"deadlock"}]}}}}"""))
+                FollowButton(button, scope, api, { tokens.userId }, { fail("Outage must not ask for sign-in") })
+                    .bind(FollowKind.CATEGORY, "deadlock", "Deadlock")
+                waitUntil { button.text == app.getString(R.string.following_state) }
+                assertTrue(button.performClick())
+                val confirmation = ShadowAlertDialog.getLatestAlertDialog()
+
+                app.debugMode.setEnabled(true)
+                app.debugMode.setNetworkingDisabled(true)
+                confirmation.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                waitUntil { ShadowToast.getTextOfLatestToast() == app.getString(R.string.unfollow_error) && button.isClickable }
+                assertEquals(app.getString(R.string.following_state), button.text)
+                assertTrue(button.isSelected)
+                assertEquals(0L, changes.revision)
+                assertEquals(1, server.requestCount)
+                assertEquals("saved", tokens.accessToken)
+
+                app.debugMode.setNetworkingDisabled(false)
+                server.enqueue(MockResponse().setBody("""{"data":{"unfollowGame":{"game":{"id":"deadlock"}}}}"""))
+                assertTrue(button.performClick())
+                ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                waitUntil { button.text == app.getString(R.string.follow) }
+                assertEquals(1L, changes.revision)
+                assertEquals("CategoryFollowState", JSONObject(server.takeRequest(1, SECONDS)!!.body.readUtf8()).getString("operationName"))
+                assertEquals("UnfollowCategory", JSONObject(server.takeRequest(1, SECONDS)!!.body.readUtf8()).getString("operationName"))
+            } finally {
+                scope.cancel()
+            }
+        }
+    }
+
+    @Test
+    fun coilCannotFetchAnUncachedRemoteImageUntilNetworkingResumes() {
+        MockWebServer().use { server ->
+            val app = RuntimeEnvironment.getApplication() as PurpleApp
+            val loader = app.newImageLoader()
+            val scope = MainScope()
+            try {
+                val request = ImageRequest.Builder(app).data(server.url("/banner.png").toString())
+                    .memoryCachePolicy(CachePolicy.DISABLED).diskCachePolicy(CachePolicy.DISABLED).build()
+                var result: ImageResult? = null
+                app.debugMode.setEnabled(true)
+                app.debugMode.setNetworkingDisabled(true)
+                scope.launch { result = loader.execute(request) }
+                waitUntil { result != null }
+                assertTrue((result as ErrorResult).throwable is IOException)
+                assertEquals(0, server.requestCount)
+
+                app.debugMode.setNetworkingDisabled(false)
+                server.enqueue(MockResponse().setHeader("Content-Type", "image/png")
+                    .setBody(Buffer().write(File("src/main/res/drawable-nodpi/banner.png").readBytes())))
+                result = null
+                scope.launch { result = loader.execute(request) }
+                waitUntil { result != null }
+                assertTrue("Image result: ${(result as? ErrorResult)?.throwable}", result is SuccessResult)
+                assertEquals(1, server.requestCount)
+            } finally {
+                scope.cancel()
+                loader.shutdown()
+            }
+        }
+    }
+
+    @Test
+    @OptIn(UnstableApi::class)
+    fun mediaRequestsAreBlockedAndAnOpenMediaBodyIsInterrupted() {
+        MockWebServer().use { server ->
+            val mode = DebugMode().apply { setEnabled(true) }
+            val liveFactory = Http.mediaFactory(mode)
+            val recordedFactory = Http.mediaFactory(mode).setUserAgent("PurpleTV")
+            val live = DataSpec(Uri.parse(server.url("/live/index.m3u8").toString()))
+            val recorded = DataSpec(Uri.parse(server.url("/recorded/clip.mp4").toString()))
+
+            mode.setNetworkingDisabled(true)
+            for ((factory, spec) in listOf(liveFactory to live, recordedFactory to recorded)) {
+                val source = factory.createDataSource()
+                try {
+                    assertThrows(IOException::class.java) { source.open(spec) }
+                } finally {
+                    source.close()
+                }
+            }
+            assertEquals(0, server.requestCount)
+
+            mode.setNetworkingDisabled(false)
+            server.enqueue(MockResponse().setBody("video data").setBodyDelay(4, SECONDS))
+            val source = recordedFactory.createDataSource()
+            val reader = Executors.newSingleThreadExecutor()
+            try {
+                source.open(recorded)
+                assertEquals("/recorded/clip.mp4", server.takeRequest(1, SECONDS)?.path)
+                val read = reader.submit { assertThrows(IOException::class.java) { source.read(ByteArray(16), 0, 16) } }
+                mode.setNetworkingDisabled(true)
+                read.get(2, SECONDS)
+            } finally {
+                reader.shutdownNow()
+                source.close()
+            }
+
+            mode.setEnabled(false)
+            server.enqueue(MockResponse().setBody("#EXTM3U"))
+            val restored = liveFactory.createDataSource()
+            try {
+                assertEquals(7L, restored.open(live))
+                assertEquals("/live/index.m3u8", server.takeRequest(1, SECONDS)?.path)
+            } finally {
+                restored.close()
+            }
+        }
+    }
+
+    private fun waitUntil(condition: () -> Boolean) {
+        val deadline = System.nanoTime() + SECONDS.toNanos(5)
+        while (System.nanoTime() < deadline) {
+            shadowOf(Looper.getMainLooper()).idle()
+            if (condition()) return
+            Thread.sleep(10)
+        }
+        fail("Timed out waiting for the main thread to show the result")
+    }
+}

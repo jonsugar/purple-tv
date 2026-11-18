@@ -2,12 +2,14 @@ package com.purpletv.chat
 
 import android.os.Handler
 import android.os.Looper
+import com.purpletv.net.DebugMode
 import com.purpletv.player.RetryPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -24,6 +26,7 @@ import kotlin.random.Random
  */
 class ChatClient(
     private val http: OkHttpClient,
+    private val debugMode: DebugMode,
     channel: String,
     private val url: String = "wss://irc-ws.chat.twitch.tv:443",
     private val deliver: Executor = MAIN_THREAD,
@@ -32,15 +35,23 @@ class ChatClient(
     private val channel = channel.trim().lowercase()
     private val retry = RetryPolicy()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    @Volatile private var socket: WebSocket? = null
+    private var socket: WebSocket? = null
     @Volatile private var closed = false
     @Volatile private var attempts = 0
 
+    @Synchronized
     fun connect() {
-        if (closed) return
-        socket = http.newWebSocket(Request.Builder().url(url).build(), Listener())
+        if (closed || socket != null) return
+        socket = debugMode.openWebSocket(http, Request.Builder().url(url).build(), Listener())
+        if (socket == null) {
+            scope.launch {
+                debugMode.state.first { !it.networkingDisabled }
+                connect()
+            }
+        }
     }
 
+    @Synchronized
     fun close() {
         closed = true
         scope.cancel()
@@ -77,9 +88,12 @@ class ChatClient(
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = reconnect(webSocket)
     }
 
+    @Synchronized
     private fun reconnect(dropped: WebSocket) {
+        debugMode.webSocketFinished(dropped)
         if (closed || dropped !== socket) return
-        val wait = retry.delayFor(attempts++)
+        socket = null
+        val wait = if (debugMode.state.value.networkingDisabled) 0 else retry.delayFor(attempts++)
         scope.launch { delay(wait); connect() }
     }
 

@@ -25,7 +25,6 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
@@ -41,6 +40,7 @@ import coil.transform.CircleCropTransformation
 import com.purpletv.PurpleApp
 import com.purpletv.R
 import com.purpletv.chat.ChatClient
+import com.purpletv.net.Http
 import com.purpletv.chat.ChatView
 import com.purpletv.twitch.Stream
 import com.purpletv.twitch.FollowKind
@@ -75,6 +75,7 @@ class PlayerActivity : Activity() {
     private val scope = MainScope()
     private val ui = Handler(Looper.getMainLooper())
     private val app get() = PurpleApp.instance
+    private val mediaFactory by lazy { Http.mediaFactory(app.debugMode) }
     private val prefs get() = app.playerPrefs
     private val retry = RetryPolicy()
 
@@ -288,7 +289,7 @@ class PlayerActivity : Activity() {
                         .setMaxPlaybackSpeed(1f)
                         .build())
                     .build()
-                val source = HlsMediaSource.Factory(DefaultHttpDataSource.Factory()).createMediaSource(item)
+                val source = HlsMediaSource.Factory(mediaFactory).createMediaSource(item)
                 exo.setMediaSource(source)
                 exo.prepare()
                 exo.playWhenReady = true
@@ -523,13 +524,13 @@ class PlayerActivity : Activity() {
         chatView.clear()
         chatView.visibility = View.VISIBLE
         setStageEnd(resources.getDimensionPixelSize(R.dimen.chat_width))
-        chat = ChatClient(app.http, login) { chatView.add(it) }.also { it.connect() }
+        chat = ChatClient(app.http, app.debugMode, login) { chatView.add(it) }.also { it.connect() }
     }
 
     private fun reconnectChat() {
         chat?.close()
         chatView.clear()
-        chat = ChatClient(app.http, login) { chatView.add(it) }.also { it.connect() }
+        chat = ChatClient(app.http, app.debugMode, login) { chatView.add(it) }.also { it.connect() }
     }
 
     private fun hideChat() {

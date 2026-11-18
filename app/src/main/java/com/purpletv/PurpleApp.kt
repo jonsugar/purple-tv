@@ -7,6 +7,7 @@ import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.PrefsTokenStore
 import com.purpletv.auth.TokenStore
 import com.purpletv.home.HomeSnapshot
+import com.purpletv.net.DebugMode
 import com.purpletv.net.Http
 import com.purpletv.player.PlayerPrefs
 import com.purpletv.twitch.HelixClient
@@ -19,10 +20,12 @@ import com.purpletv.twitch.FollowChanges
 import com.purpletv.twitch.PlaybackApi
 import com.purpletv.player.ZapList
 import com.purpletv.twitch.deviceId
+import com.purpletv.ui.DebugIndicator
 import okhttp3.OkHttpClient
 
 /** Holds the app-wide singletons; screens reach them through [instance]. */
 class PurpleApp : Application(), ImageLoaderFactory {
+    val debugMode = DebugMode()
     lateinit var http: OkHttpClient
     lateinit var tokens: TokenStore
     lateinit var playback: PlaybackApi
@@ -41,7 +44,8 @@ class PurpleApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        http = Http.client()
+        DebugIndicator(this, debugMode)
+        http = Http.client(debugMode)
         tokens = PrefsTokenStore(getSharedPreferences("purpletv", MODE_PRIVATE))
         auth = DeviceAuth(http, TV_CLIENT_ID, SCOPES, tokens)
         playback = PlaybackApi(http, auth)
@@ -55,7 +59,10 @@ class PurpleApp : Application(), ImageLoaderFactory {
     }
 
     /** Pictures fade in briefly; Coil skips the fade for images already in its memory cache. */
-    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this).crossfade(IMAGE_FADE_MS).build()
+    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
+        .callFactory { Http.imageCalls(debugMode) }
+        .crossfade(IMAGE_FADE_MS)
+        .build()
 
     companion object {
         /**

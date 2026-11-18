@@ -92,6 +92,12 @@
     <string name="profile_chat_desc">Si apre e si chiude anche dal pulsante chat nel lettore</string>
     <string name="profile_chat_on">Visibile</string>
     <string name="profile_chat_off">Nascosta</string>
+    <string name="profile_debug">Debug</string>
+    <string name="debug_enable">Abilita la modalità debug</string>
+    <string name="debug_disable_networking">Disattiva la rete</string>
+    <string name="debug_close">Chiudi</string>
+    <string name="debug_badge">Modalità debug</string>
+    <string name="debug_networking_disabled">Rete disattivata</string>
     <string name="player_reconnecting">Connessione persa, riprovo…</string>
     <string name="tune_label">Sintonizzazione</string>
     <string name="zap_button">Canali</string>

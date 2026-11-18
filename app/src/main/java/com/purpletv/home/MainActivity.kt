@@ -50,7 +50,7 @@ class MainActivity : Activity() {
             findViewById<View>(R.id.nav_following).nextFocusRightId = tabId
         }
         search = SearchPage(this, scope, app.helix, app.snapshot, RecentSearches(getSharedPreferences(SEARCH_PREFS, MODE_PRIVATE)))
-        profile = ProfilePage(this, app.playerPrefs, ::logout)
+        profile = ProfilePage(this, app.playerPrefs, app.debugMode, ::logout)
         rail = NavRail(findViewById(R.id.nav_rail), ::showScreen)
         following.bindAccount(app.tokens.userId)
         // From the rail's Cerca, Right goes to the field above the suggestions, not into them.

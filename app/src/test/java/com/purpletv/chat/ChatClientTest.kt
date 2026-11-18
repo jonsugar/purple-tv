@@ -1,5 +1,8 @@
 package com.purpletv.chat
 
+import com.purpletv.net.DebugMode
+import com.purpletv.net.Http
+import okhttp3.Request
 import okhttp3.OkHttpClient
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -48,7 +51,8 @@ class ChatClientTest {
         }))
         server.start()
         val messages = LinkedBlockingQueue<ChatMessage>()
-        val client = ChatClient(OkHttpClient(), "PGL", server.url("/").toString().replace("http", "ws"),
+        val debugMode = DebugMode()
+        val client = ChatClient(OkHttpClient(), debugMode, "PGL", server.url("/").toString().replace("http", "ws"),
             deliver = Executor { it.run() }) { messages.add(it) }
 
         client.connect()
@@ -69,5 +73,46 @@ class ChatClientTest {
         assertNull(messages.poll(300, MILLISECONDS))
 
         client.close()
+    }
+
+    @Test
+    fun outageInterruptsChatAndBlocksAnotherHandshakeUntilNetworkingResumes() {
+        val debugMode = DebugMode().apply { setEnabled(true) }
+        val http = Http.client(debugMode)
+        val disconnected = CountDownLatch(1)
+        val joined = LinkedBlockingQueue<String>()
+        repeat(2) {
+            server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    if (text.startsWith("JOIN ")) joined.add(text)
+                }
+
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                    disconnected.countDown()
+                }
+
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                    webSocket.close(code, null)
+                }
+            }))
+        }
+        server.start()
+        val client = ChatClient(http, debugMode, "pgl", server.url("/").toString(), deliver = Executor { it.run() }) {}
+        try {
+            client.connect()
+            assertEquals("JOIN #pgl", joined.poll(5, SECONDS))
+
+            debugMode.setNetworkingDisabled(true)
+            assertTrue(disconnected.await(5, SECONDS))
+            assertNull(debugMode.openWebSocket(http, Request.Builder().url(server.url("/")).build(), object : WebSocketListener() {}))
+            assertNull(joined.poll(200, MILLISECONDS))
+            assertEquals(1, server.requestCount)
+
+            debugMode.setNetworkingDisabled(false)
+            assertEquals("JOIN #pgl", joined.poll(5, SECONDS))
+            assertEquals(2, server.requestCount)
+        } finally {
+            client.close()
+        }
     }
 }
