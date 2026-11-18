@@ -27,6 +27,7 @@ import com.purpletv.ui.Pager
 import com.purpletv.ui.RowAdapter
 import com.purpletv.ui.RowItem
 import com.purpletv.ui.RowKind
+import com.purpletv.ui.emptyMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -41,6 +42,7 @@ class FollowingPage(
     private val api: FollowingApi,
     private val avatars: AvatarCache,
     private val pins: PinStore,
+    private val streamPrefs: StreamPreferences,
     private val onAuthRequired: () -> Unit,
     private val onTabSelected: (Int) -> Unit = {},
 ) {
@@ -95,7 +97,6 @@ class FollowingPage(
     }, onAuthRequired) { items, failed ->
         liveItems = items
         renderLive()
-        livePage.show(items.size, failed)
         if (!failed) liveLoadedAt = SystemClock.elapsedRealtime()
         val requestedAccount = account
         scope.launch {
@@ -300,12 +301,16 @@ class FollowingPage(
     }
 
     private fun renderLive() {
-        val (pinned, regular) = splitByPins(liveItems, pins.list(account, FollowKind.CHANNEL), Stream::userId)
+        val language = streamPrefs.language.value
+        val (pinned, regular) = splitByPins(language.filter(liveItems), pins.list(account, FollowKind.CHANNEL), Stream::userId)
         orderedLive = pinned + regular
         pinnedLive.submitList(pinned.map { RowItem.StreamItem(it) })
         liveAdapter.submitList(regular.map { RowItem.StreamItem(it) })
         liveSections.show(pinned.size, regular.size)
+        if (live.hasLoaded) livePage.show(orderedLive.size, live.hasFailed, language.emptyMessage(R.string.followed_empty))
     }
+
+    fun refreshLanguage() = renderLive()
 
     private fun renderCategories(restore: String? = null) {
         val (pinned, regular) = splitByPins(categoryItems, pins.list(account, FollowKind.CATEGORY), Category::id)

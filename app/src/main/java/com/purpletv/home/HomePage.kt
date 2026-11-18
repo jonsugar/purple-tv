@@ -21,6 +21,7 @@ import com.purpletv.twitch.HelixClient
 import com.purpletv.twitch.HomeApi
 import com.purpletv.twitch.NotLoggedInException
 import com.purpletv.twitch.Shelf
+import com.purpletv.twitch.Stream
 import com.purpletv.ui.AvatarCache
 import com.purpletv.ui.Nav
 import com.purpletv.ui.RowItem
@@ -43,6 +44,7 @@ class HomePage(
     private val avatars: AvatarCache,
     private val snapshot: HomeSnapshot,
     private val pins: PinStore,
+    private val streamPrefs: StreamPreferences,
 ) {
     val view: View = LayoutInflater.from(context).inflate(R.layout.page_home, null)
 
@@ -72,24 +74,26 @@ class HomePage(
     /** Loads the rows; only a lost login escapes as [NotLoggedInException]. */
     suspend fun load(userId: String) = coroutineScope {
         val followedStreams = async { runCatching { helix.followedStreams(userId) } }
-        val shelves = async { runCatching { homeApi.shelves() } }
+        val shelves = async { runCatching { loadRecommendations() } }
         val followedResult = followedStreams.await()
         (followedResult.exceptionOrNull() as? NotLoggedInException)?.let { throw it }
-        val twitchRows = shelves.await()
+        val recommendations = shelves.await()
+        (recommendations.exceptionOrNull() as? NotLoggedInException)?.let { throw it }
+        val below = recommendations
             .onFailure { Log.w(TAG, "home rows unavailable: ${it.message}") }
             .getOrDefault(emptyList())
-        twitchRows.forEach {
+        below.forEach {
             Log.i(TAG, "home row ${it.rowName} \"${it.title}\" streams=${it.streams.size} categories=${it.categories.size}")
         }
-        val below = rowsBelowFollowed(twitchRows)
         val lower = if (below.isNotEmpty()) below.map(::shelfRow) else helixRows()
+        coroutineContext.ensureActive()
         val followed = HomeRow(
             context.getString(R.string.row_followed), RowKind.STREAMS,
             followedResult.map { list -> list.map { RowItem.StreamItem(it) } }, emptyText = R.string.followed_empty,
         )
         sourceRows = listOf(followed) + lower
         rowsAccount = userId
-        adapter.submit(withChannelPins(sourceRows, pins.list(userId, FollowKind.CHANNEL)))
+        applyStreamPreferences(userId)
         adapter.warmUp(rows)
         focusedRow = -1
         rows.scrollToPosition(0)
@@ -121,10 +125,14 @@ class HomePage(
         adapter.submit(listOf(HomeRow(context.getString(R.string.row_followed), RowKind.STREAMS, Result.failure(RuntimeException()))))
     }
 
-    fun applyPins(account: String?) {
+    fun applyStreamPreferences(account: String?) {
         if (rowsAccount != account || sourceRows.isEmpty()) return
-        val pinnedRows = withChannelPins(sourceRows, pins.list(account, FollowKind.CHANNEL))
-        if (pinnedRows != adapter.rows) adapter.submit(pinnedRows)
+        val matching = filterLiveRows(sourceRows, streamPrefs.language.value)
+        val pinnedRows = withChannelPins(matching, pins.list(account, FollowKind.CHANNEL))
+        if (pinnedRows != adapter.rows) {
+            hero.clearMissingCard(pinnedRows)
+            adapter.submit(pinnedRows)
+        }
     }
 
     fun clearPreviousAccount(account: String?) {
@@ -191,6 +199,15 @@ class HomePage(
         if (shelf.streams.isNotEmpty()) HomeRow(shelf.title, RowKind.STREAMS, Result.success(shelf.streams.map { RowItem.StreamItem(it) }), shelf.avatars)
         else HomeRow(shelf.title, RowKind.CATEGORIES, Result.success(shelf.categories.map { RowItem.CategoryItem(it) }))
 
+    private suspend fun loadRecommendations(): List<Shelf> {
+        val shelves = rowsBelowFollowed(homeApi.shelves())
+        val ids = shelves.flatMap { shelf -> shelf.streams.map(Stream::userId) }.filter(String::isNotEmpty)
+        val metadata = helix.streamsByUserIds(ids).associateBy(Stream::userId)
+        return shelves.map { shelf ->
+            shelf.copy(streams = shelf.streams.map { it.copy(language = metadata[it.userId]?.language.orEmpty()) })
+        }
+    }
+
     /** The rows Home had before Twitch's own: the most watched streams and categories. */
     private suspend fun helixRows(): List<HomeRow> = coroutineScope {
         val topStreams = async { runCatching { helix.topStreams().items } }
@@ -240,6 +257,22 @@ class HomePage(
         /** Shows the current card again, for avatars that arrived after it. */
         fun refresh() {
             shown?.let(::show)
+        }
+
+        fun clearMissingCard(rows: List<HomeRow>) {
+            cancel()
+            val item = shown ?: return
+            if (rows.none { item in it.items.getOrNull().orEmpty() }) {
+                shown = null
+                block.visibility = View.INVISIBLE
+                a.animate().cancel()
+                b.animate().cancel()
+                a.visibility = View.INVISIBLE
+                b.visibility = View.INVISIBLE
+                a.clear()
+                b.clear()
+                backdrop = null
+            }
         }
 
         private fun show(item: RowItem) {

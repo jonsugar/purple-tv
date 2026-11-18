@@ -64,6 +64,37 @@ class HelixClientTest {
     }
 
     @Test
+    fun livePageUsesTheLanguageAndCursorAndAllowsMissingLanguageInAllMode() = runTest {
+        val mixed = """{"data":[{"user_id":"1","language":"en"},{"user_id":"2","language":"it"},{"user_id":"3","language":null}],"pagination":{"cursor":"next"}}"""
+        repeat(2) { server.enqueue(MockResponse().setBody(mixed)) }
+
+        val english = helix.topStreams(gameId = "game", cursor = "first-page", language = StreamLanguage.ENGLISH)
+        assertEquals(listOf("1"), english.items.map(Stream::userId))
+        assertEquals("next", english.cursor)
+        val filteredUrl = server.takeRequest().requestUrl!!
+        assertEquals("en", filteredUrl.queryParameter("language"))
+        assertEquals("game", filteredUrl.queryParameter("game_id"))
+        assertEquals("first-page", filteredUrl.queryParameter("after"))
+
+        assertEquals(listOf("en", "it", ""), helix.topStreams().items.map(Stream::language))
+        assertNull(server.takeRequest().requestUrl!!.queryParameter("language"))
+    }
+
+    @Test
+    fun looksUpRecommendationLanguagesByBroadcasterInBatches() = runTest {
+        server.enqueue(MockResponse().setBody("""{"data":[{"user_id":"1","language":"en"}]}"""))
+        server.enqueue(MockResponse().setBody("""{"data":[{"user_id":"101","language":"it"}]}"""))
+
+        val streams = helix.streamsByUserIds((1..101).map(Int::toString) + "1")
+
+        assertEquals(listOf("en", "it"), streams.map(Stream::language))
+        val first = server.takeRequest().requestUrl!!
+        assertEquals("/helix/streams", first.encodedPath)
+        assertEquals(100, first.queryParameterValues("user_id").size)
+        assertEquals(listOf("101"), server.takeRequest().requestUrl!!.queryParameterValues("user_id"))
+    }
+
+    @Test
     fun usersBatchesIds() = runTest {
         server.enqueue(MockResponse().setBody("""{"data":[]}"""))
         helix.users(listOf("1", "2"))

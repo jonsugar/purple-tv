@@ -147,7 +147,8 @@ class PlayerActivity : Activity() {
         chatButton.nextFocusUpId = R.id.overlay_back
         zapButton.nextFocusUpId = R.id.overlay_back
         followView.nextFocusUpId = R.id.overlay_back
-        zap = app.zap ?: ZapList(getString(R.string.row_followed), app.snapshot.followedLive)
+        val source = app.zap ?: ZapList(getString(R.string.row_followed), app.snapshot.followedLive)
+        zap = source.copy(streams = app.streamPrefs.language.value.filter(source.streams))
         zapButton.visibility = if (zap.isEmpty()) View.GONE else View.VISIBLE
         chatButton.nextFocusRightId = if (zap.isEmpty()) R.id.overlay_follow else R.id.overlay_zap
         zapButton.nextFocusRightId = R.id.overlay_follow
@@ -366,7 +367,7 @@ class PlayerActivity : Activity() {
         message.visibility = View.GONE
         offlinePage.visibility = View.VISIBLE
         findViewById<TextView>(R.id.offline_title).text = getString(R.string.offline_title, channelName)
-        val suggestions = offlineSuggestions(app.snapshot.followedLive, login)
+        val suggestions = offlineSuggestions(app.streamPrefs.language.value.filter(app.snapshot.followedLive), login)
         val row = findViewById<View>(R.id.offline_row)
         row.visibility = if (suggestions.isEmpty()) View.GONE else View.VISIBLE
         offlineAdapter.avatars = app.snapshot.avatars

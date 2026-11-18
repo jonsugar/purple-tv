@@ -55,9 +55,15 @@ class HelixClient(
     suspend fun streamByLogin(login: String): Stream? =
         HelixParser.streams(get("streams", listOf("user_login" to login.trim().lowercase()))).items.firstOrNull()
 
-    suspend fun topStreams(gameId: String? = null, cursor: String? = null): Page<Stream> =
+    /** Live metadata for Home recommendations, whose shelves don't supply the stream language. */
+    suspend fun streamsByUserIds(ids: List<String>): List<Stream> = ids.distinct().chunked(MAX_IDS).flatMap { chunk ->
+        HelixParser.streams(get("streams", chunk.map { "user_id" to it })).items
+    }
+
+    suspend fun topStreams(gameId: String? = null, cursor: String? = null, language: StreamLanguage = StreamLanguage.ALL): Page<Stream> =
         HelixParser.streams(get("streams", listOfNotNull(
-            "first" to PAGE_SIZE, gameId?.let { "game_id" to it }, cursor?.let { "after" to it })))
+            "first" to PAGE_SIZE, gameId?.let { "game_id" to it }, cursor?.let { "after" to it },
+            language.code?.let { "language" to it }))).let { it.copy(items = language.filter(it.items)) }
 
     suspend fun topCategories(cursor: String? = null): Page<Category> =
         HelixParser.categories(get("games/top", listOfNotNull("first" to PAGE_SIZE, cursor?.let { "after" to it })))

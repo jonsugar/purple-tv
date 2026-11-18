@@ -2,6 +2,8 @@ package com.purpletv.home
 
 import com.purpletv.twitch.Shelf
 import com.purpletv.twitch.Stream
+import com.purpletv.twitch.StreamLanguage
+import com.purpletv.twitch.Category
 import com.purpletv.ui.RowItem
 import com.purpletv.ui.RowKind
 import org.junit.Assert.assertEquals
@@ -36,5 +38,26 @@ class HomeRowsTest {
         assertEquals(expected + regular, rows[0].items.getOrThrow())
         assertEquals(listOf(recommended), rows[1].items.getOrThrow())
         assertEquals(listOf(followed, other), withChannelPins(listOf(followed, other), emptyList()))
+    }
+
+    @Test
+    fun filtersFollowedAndRecommendedShelvesWithoutChangingCategoriesOrErrors() {
+        fun item(id: String, language: String) = RowItem.StreamItem(Stream(id, id, id, "", "", "", 0, "", language = language))
+        val english = item("english", "en")
+        val italian = item("italian", "it")
+        val unknown = item("unknown", "")
+        val followed = HomeRow("Live followed channels", RowKind.STREAMS, Result.success(listOf(italian, english)))
+        val recommended = HomeRow("Recommended", RowKind.STREAMS, Result.success(listOf(unknown, english, italian)))
+        val allFiltered = HomeRow("All filtered", RowKind.STREAMS, Result.success(listOf(unknown)))
+        val category = HomeRow("Categories", RowKind.CATEGORIES, Result.success(listOf(RowItem.CategoryItem(Category("1", "Games", "")))))
+        val failed = HomeRow("Failed", RowKind.STREAMS, Result.failure(IllegalStateException()))
+        val source = listOf(followed, recommended, allFiltered, category, failed)
+
+        val matching = filterLiveRows(source, StreamLanguage.ENGLISH)
+        assertEquals(listOf(followed.title, recommended.title, category.title, failed.title), matching.map(HomeRow::title))
+        assertEquals(listOf(english), matching[0].items.getOrThrow())
+        assertEquals(listOf(english), matching[1].items.getOrThrow())
+        assertEquals(listOf(category, failed), matching.drop(2))
+        assertEquals(source, filterLiveRows(source, StreamLanguage.ALL))
     }
 }

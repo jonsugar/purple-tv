@@ -73,8 +73,13 @@
 
     <string name="tab_categories">Categorie</string>
     <string name="tab_live">Canali in diretta</string>
-    <string name="category_subtitle">Dirette in corso, dalla più seguita</string>
+    <string name="category_subtitle">Dirette in corso</string>
     <string name="category_empty">Nessuna diretta in questa categoria</string>
+    <string name="browse_live_empty">Nessuna diretta</string>
+    <string name="language_control">Lingua: %1$s</string>
+    <string name="language_all">Tutte le lingue</string>
+    <string name="language_english">Solo inglese</string>
+    <string name="language_no_matches">Nessuna diretta in inglese</string>
 
     <string name="search_hint">Cerca canali e categorie</string>
     <string name="row_channels">Canali</string>

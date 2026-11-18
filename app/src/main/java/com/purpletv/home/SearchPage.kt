@@ -38,6 +38,7 @@ class SearchPage(
     private val helix: HelixClient,
     private val snapshot: HomeSnapshot,
     private val recent: RecentSearches,
+    private val streamPrefs: StreamPreferences,
 ) {
     val view: View = LayoutInflater.from(context).inflate(R.layout.page_search, null)
 
@@ -120,7 +121,7 @@ class SearchPage(
         }
         recentTitle.visibility = if (queries.isEmpty()) View.GONE else View.VISIBLE
         recentScroll.visibility = recentTitle.visibility
-        followed.showOrHide(snapshot.followedLive.map { RowItem.ChannelItem(it.asChannel(snapshot.avatars[it.userId])) })
+        refreshLiveSuggestions()
         val suggested = snapshot.recommendedCategories.ifEmpty { topCategories.orEmpty() }
         suggest.showOrHide(suggested.map { RowItem.CategoryItem(it) })
         if (suggested.isEmpty()) scope.launch {
@@ -165,7 +166,15 @@ class SearchPage(
         if (opened) recent.add(field.text.toString())
     }
 
-    private fun followedZap() = ZapList(context.getString(R.string.row_followed), snapshot.followedLive)
+    fun refreshLiveSuggestions() {
+        if (empty.visibility == View.VISIBLE) {
+            followed.showOrHide(filteredFollowed().map { RowItem.ChannelItem(it.asChannel(snapshot.avatars[it.userId])) })
+        }
+    }
+
+    private fun filteredFollowed() = streamPrefs.language.value.filter(snapshot.followedLive)
+
+    private fun followedZap() = ZapList(context.getString(R.string.row_followed), filteredFollowed())
 
     private inner class Row(val root: View, title: Int, kind: RowKind) {
         private val empty: TextView = root.findViewById(R.id.row_empty)

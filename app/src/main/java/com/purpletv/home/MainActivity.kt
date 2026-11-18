@@ -47,18 +47,31 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         content = findViewById(R.id.content)
         val avatars = AvatarCache(app.helix)
-        home = HomePage(this, app.helix, app.home, avatars, app.snapshot, app.pins)
-        browse = BrowsePage(this, scope, app.helix, avatars)
-        following = FollowingPage(this, scope, app.helix, app.following, avatars, app.pins, ::requireLogin) { tabId ->
+        home = HomePage(this, app.helix, app.home, avatars, app.snapshot, app.pins, app.streamPrefs)
+        browse = BrowsePage(this, scope, app.helix, avatars, app.streamPrefs) { tabId ->
+            findViewById<View>(R.id.nav_browse).nextFocusRightId = tabId
+        }
+        following = FollowingPage(this, scope, app.helix, app.following, avatars, app.pins, app.streamPrefs, ::requireLogin) { tabId ->
             findViewById<View>(R.id.nav_following).nextFocusRightId = tabId
         }
-        search = SearchPage(this, scope, app.helix, app.snapshot, RecentSearches(getSharedPreferences(SEARCH_PREFS, MODE_PRIVATE)))
+        search = SearchPage(this, scope, app.helix, app.snapshot,
+            RecentSearches(getSharedPreferences(SEARCH_PREFS, MODE_PRIVATE)), app.streamPrefs)
         profile = ProfilePage(this, app.playerPrefs, app.debugMode, ::logout)
         rail = NavRail(findViewById(R.id.nav_rail), ::showScreen)
         following.bindAccount(app.tokens.userId)
         // From the rail's Cerca, Right goes to the field above the suggestions, not into them.
         findViewById<View>(R.id.nav_search).nextFocusRightId = R.id.search_field
         openScreen(screenFrom(intent.getStringExtra(EXTRA_SCREEN)))
+        var previousLanguage = app.streamPrefs.language.value
+        scope.launch {
+            app.streamPrefs.language.collect { language ->
+                if (previousLanguage == language) return@collect
+                previousLanguage = language
+                home.applyStreamPreferences(app.tokens.userId)
+                following.refreshLanguage()
+                search.refreshLiveSuggestions()
+            }
+        }
     }
 
     /** The category page's rail opens a main screen by name. */
@@ -85,9 +98,10 @@ class MainActivity : Activity() {
         following.onReturn(pinsChanged, followChanged)
         if (pinsChanged) {
             pinRevision = app.pins.revisions.value
-            home.applyPins(app.tokens.userId)
+            home.applyStreamPreferences(app.tokens.userId)
         }
         if (screen == Screen.FOLLOWING) following.show()
+        if (screen == Screen.BROWSE) browse.show()
         when {
             awaitingLogin -> Unit
             app.tokens.accessToken == null -> { loadedAtMs = 0; login() }
@@ -107,7 +121,7 @@ class MainActivity : Activity() {
                 if (revision == pinRevision) return@collect
                 pinRevision = revision
                 following.applyPins()
-                home.applyPins(app.tokens.userId)
+                home.applyStreamPreferences(app.tokens.userId)
             }
         }
     }
@@ -198,6 +212,7 @@ class MainActivity : Activity() {
                 app.snapshot.meAvatar = user.profileImageUrl
                 rail.setAvatar(user.profileImageUrl)
                 home.load(user.id)
+                search.refreshLiveSuggestions()
             } catch (e: NotLoggedInException) {
                 loadedAtMs = 0
                 login()

@@ -75,8 +75,13 @@
 
     <string name="tab_categories">Categories</string>
     <string name="tab_live">Live channels</string>
-    <string name="category_subtitle">Live now, most watched first</string>
+    <string name="category_subtitle">Live streams</string>
     <string name="category_empty">No live streams in this category</string>
+    <string name="browse_live_empty">No live streams</string>
+    <string name="language_control">Language: %1$s</string>
+    <string name="language_all">All languages</string>
+    <string name="language_english">English only</string>
+    <string name="language_no_matches">No English live streams</string>
 
     <string name="search_hint">Search channels and categories</string>
     <string name="row_channels">Channels</string>

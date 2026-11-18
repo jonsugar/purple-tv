@@ -61,6 +61,24 @@ class PagerTest {
     }
 
     @Test
+    fun advancesPastPagesThatCannotTriggerAnotherGridLoad() = runTest {
+        var shown = emptyList<String>()
+        val pager = Pager(this, key = { id: String -> id }, fetch = { cursor ->
+            when (cursor) {
+                null -> Page(emptyList(), "second")
+                "second" -> Page(listOf("a"), "third")
+                "third" -> Page(listOf("a"), "fourth")
+                else -> Page(listOf("b"), null)
+            }
+        }) { items, _ -> shown = items }
+
+        pager.loadMore(); advanceUntilIdle()
+        assertEquals(listOf("a"), shown)
+        pager.loadMore(); advanceUntilIdle()
+        assertEquals(listOf("a", "b"), shown)
+    }
+
+    @Test
     fun ignoresLoadsWhileOneIsRunning() = runTest {
         var calls = 0
         val pager = Pager(this, key = { it }, fetch = { calls++; Page(listOf("a"), "next") }, onPage = { _, _ -> })

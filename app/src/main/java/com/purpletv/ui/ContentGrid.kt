@@ -8,12 +8,13 @@ import androidx.recyclerview.widget.RecyclerView
 import com.purpletv.R
 
 /** A grid with an independent status and a remote-focusable retry action. */
-class ContentGrid(context: Context, emptyText: Int, retry: () -> Unit) {
-    val view: View = LayoutInflater.from(context).inflate(R.layout.view_content_grid, null)
+class ContentGrid(val view: View, private val emptyText: Int, retry: () -> Unit) {
+    constructor(context: Context, emptyText: Int, retry: () -> Unit) :
+        this(LayoutInflater.from(context).inflate(R.layout.view_content_grid, null), emptyText, retry)
+
     val grid: RecyclerView = view.findViewById(R.id.content_grid)
     private val status: TextView = view.findViewById(R.id.content_status)
     private val retryButton: View = view.findViewById(R.id.content_retry)
-    private val empty = emptyText
 
     init { retryButton.setOnClickListener { retry() } }
 
@@ -23,7 +24,7 @@ class ContentGrid(context: Context, emptyText: Int, retry: () -> Unit) {
         retryButton.visibility = View.GONE
     }
 
-    fun show(count: Int, failed: Boolean) {
+    fun show(count: Int, failed: Boolean, empty: Int = emptyText) {
         status.setText(if (failed) R.string.row_error else empty)
         status.visibility = if (count == 0 || failed) View.VISIBLE else View.GONE
         val hadRetryFocus = retryButton.hasFocus()

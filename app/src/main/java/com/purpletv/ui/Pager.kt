@@ -19,6 +19,7 @@ class Pager<T>(
     private val onPage: (items: List<T>, failed: Boolean) -> Unit,
 ) {
     private val items = LinkedHashMap<String, T>()
+    private val seenCursors = mutableSetOf<String>()
     private var cursor: String? = null
     private var finished = false
     private var loading = false
@@ -36,6 +37,7 @@ class Pager<T>(
         generation++
         job?.cancel()
         items.clear()
+        seenCursors.clear()
         cursor = null
         finished = false
         loading = false
@@ -52,12 +54,16 @@ class Pager<T>(
         val requestGeneration = generation
         job = scope.launch {
             try {
-                val page = fetch(cursor)
-                if (requestGeneration != generation) return@launch
-                if (page.cursor != null && page.cursor == cursor) throw IOException("Repeated pagination cursor")
-                page.items.forEach { item -> val id = key(item); if (id !in items) items[id] = item }
-                cursor = page.cursor
-                finished = page.cursor == null || page.items.isEmpty()
+                val previousSize = items.size
+                // An empty or duplicate-only page cannot trigger a grid's load-more callback.
+                do {
+                    val page = fetch(cursor)
+                    if (requestGeneration != generation) return@launch
+                    if (page.cursor != null && !seenCursors.add(page.cursor)) throw IOException("Repeated pagination cursor")
+                    page.items.forEach { item -> val id = key(item); if (id !in items) items[id] = item }
+                    cursor = page.cursor
+                } while (cursor != null && items.size == previousSize)
+                finished = cursor == null
                 hasLoaded = true
                 onPage(items.values.toList(), false)
             } catch (e: IOException) {

@@ -32,28 +32,20 @@
             style="@style/Tab"
             android:layout_marginStart="12dp"
             android:text="@string/tab_live" />
+
+        <TextView
+            android:id="@+id/browse_language"
+            style="@style/Tab"
+            android:layout_marginStart="12dp"
+            android:nextFocusLeft="@id/tab_live"
+            android:visibility="gone" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/browse_status"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="12dp"
-        android:textColor="@color/text_secondary"
-        android:textSize="10sp"
-        android:visibility="gone" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/browse_grid"
+    <include
+        android:id="@+id/browse_results"
+        layout="@layout/view_content_grid"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="10dp"
-        android:layout_weight="1"
-        android:clipChildren="false"
-        android:clipToPadding="false"
-        android:overScrollMode="never"
-        android:paddingStart="6dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="40dp" />
+        android:layout_weight="1" />
 </LinearLayout>
