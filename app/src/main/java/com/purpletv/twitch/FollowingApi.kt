@@ -39,7 +39,13 @@ class TwitchGraphQl(
             if (!response.isSuccessful) throw IOException("Twitch answered HTTP ${response.code}")
             try {
                 val root = JSONObject(response.body?.string().orEmpty())
-                if (root.optJSONArray("errors")?.length()?.let { it > 0 } == true) throw IOException("Twitch could not load this content")
+                val errors = root.optJSONArray("errors")
+                if (errors != null && errors.length() > 0) {
+                    if ((0 until errors.length()).any {
+                        errors.optJSONObject(it)?.optJSONObject("extensions")?.optString("code") == "Unauthenticated"
+                    }) return null
+                    throw IOException("Twitch could not load this content")
+                }
                 root.optJSONObject("data") ?: throw IOException("Missing Twitch data")
             } catch (e: JSONException) {
                 throw IOException("Unexpected Twitch response", e)

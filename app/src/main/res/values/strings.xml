@@ -20,6 +20,9 @@
     <string name="follow_loading">Checking…</string>
     <string name="follow_retry">Retry follow status</string>
     <string name="follow_error">Couldn’t follow. Please try again.</string>
+    <string name="unfollow">Unfollow</string>
+    <string name="unfollow_title">Unfollow %1$s?</string>
+    <string name="unfollow_error">Couldn’t unfollow. Please try again.</string>
     <string name="following_tab_live">Live</string>
     <string name="following_live_categories">Live categories</string>
     <string name="following_followed_channels">Followed channels</string>

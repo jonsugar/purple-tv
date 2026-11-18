@@ -28,6 +28,7 @@ import com.purpletv.ui.clear
 import com.purpletv.ui.viewersText
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 
 /**
  * Home like the official TV app, made immersive: the focused card fills the top (the hero), and
@@ -92,6 +93,7 @@ class HomePage(
         val bareIds = (listOf(followed) + lower).filter { it.avatars.isEmpty() }
             .flatMap { row -> row.items.getOrDefault(emptyList()).mapNotNull { (it as? RowItem.StreamItem)?.stream?.userId } }
         val urls = runCatching { avatars.urls(bareIds) }.getOrDefault(emptyMap())
+        coroutineContext.ensureActive()
         if (urls.isNotEmpty()) adapter.addAvatars(urls)
         hero.refresh()
 

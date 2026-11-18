@@ -13,8 +13,10 @@ import com.purpletv.twitch.NotLoggedInException
 import com.purpletv.twitch.User
 import com.purpletv.ui.AvatarCache
 import com.purpletv.ui.NavRail
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import java.io.IOException
 
@@ -33,7 +35,9 @@ class MainActivity : Activity() {
     private var me: User? = null
     private var loadedAtMs = 0L
     private var awaitingLogin = false
-    private var followRevision = 0L
+    private var followRevision = app.followChanges.revision
+    private var followUpdates: Job? = null
+    private var homeLoad: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,9 +82,19 @@ class MainActivity : Activity() {
             app.tokens.accessToken == null -> { loadedAtMs = 0; login() }
             homeIsStale(loadedAtMs, SystemClock.elapsedRealtime()) -> load()
         }
+        followUpdates = scope.launch {
+            app.followChanges.revisions.collect { revision ->
+                if (revision == followRevision) return@collect
+                followRevision = revision
+                loadedAtMs = 0
+                if (screen == Screen.FOLLOWING) following.show()
+                if (!awaitingLogin && app.tokens.accessToken != null) load()
+            }
+        }
     }
 
     override fun onStop() {
+        followUpdates?.cancel()
         home.stop()
         super.onStop()
     }
@@ -144,9 +158,11 @@ class MainActivity : Activity() {
 
     private fun load() {
         loadedAtMs = SystemClock.elapsedRealtime()
-        scope.launch {
+        homeLoad?.cancel()
+        homeLoad = scope.launch {
             try {
                 val user = app.helix.me()
+                ensureActive()
                 me = user
                 app.tokens.userId = user.id
                 following.bindAccount(user.id)

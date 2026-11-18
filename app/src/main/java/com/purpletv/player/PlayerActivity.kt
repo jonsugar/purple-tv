@@ -89,6 +89,7 @@ class PlayerActivity : Activity() {
     private lateinit var zapButton: View
     private lateinit var followView: View
     private lateinit var followButton: FollowButton
+    private var confirmingUnfollow = false
     private lateinit var zapStrip: View
     private val zapAdapter = ZapAdapter { zapTo(it) }
     private lateinit var qualityMenu: View
@@ -128,7 +129,10 @@ class PlayerActivity : Activity() {
             startActivity(android.content.Intent(this, com.purpletv.home.MainActivity::class.java)
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP))
             finish()
-        }, ::updateButtonLabel)
+        }, ::updateButtonLabel) { confirming ->
+            confirmingUnfollow = confirming
+            if (overlay.visibility == View.VISIBLE) scheduleAutoHide()
+        }
         zapStrip = findViewById(R.id.zap_strip)
         backButton.setOnClickListener { finish() }
         qualityButton.setOnClickListener { showQualityMenu() }
@@ -550,7 +554,7 @@ class PlayerActivity : Activity() {
             val live = runCatching { app.helix.streamByLogin(requestedLogin) }.getOrNull() ?: return@launch
             if (login != requestedLogin) return@launch
             stream = live
-            followButton.bind(FollowKind.CHANNEL, live.userId)
+            followButton.bind(FollowKind.CHANNEL, live.userId, live.displayName.ifBlank { live.login })
             val avatar = runCatching { AvatarCache(app.helix).urls(listOf(live.userId))[live.userId] }.getOrNull()
             if (login != requestedLogin) return@launch
             avatar?.let {
@@ -619,7 +623,9 @@ class PlayerActivity : Activity() {
 
     private fun scheduleAutoHide() {
         ui.removeCallbacks(autoHide)
-        if (qualityMenu.visibility != View.VISIBLE && zapStrip.visibility != View.VISIBLE) ui.postDelayed(autoHide, OVERLAY_TIMEOUT_MS)
+        if (!confirmingUnfollow && qualityMenu.visibility != View.VISIBLE && zapStrip.visibility != View.VISIBLE) {
+            ui.postDelayed(autoHide, OVERLAY_TIMEOUT_MS)
+        }
     }
 
     private val autoHide = Runnable { hideOverlay() }
@@ -669,7 +675,7 @@ class PlayerActivity : Activity() {
         if (target.login.equals(login, ignoreCase = true)) return
         login = target.login.lowercase()
         followButton.clear()
-        followButton.bind(FollowKind.CHANNEL, target.userId)
+        followButton.bind(FollowKind.CHANNEL, target.userId, target.displayName.ifBlank { target.login })
         stream = target
         bindTune(target.toTuneInfo(app.snapshot.avatars[target.userId]))
         message.visibility = View.GONE

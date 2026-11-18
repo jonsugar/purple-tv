@@ -2,6 +2,8 @@ package com.purpletv.twitch
 
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -97,4 +99,78 @@ class FollowApiTest {
         server.enqueue(MockResponse().setBody("""{"data":{"user":{"self":null}}}"""))
         try { api.isFollowing(FollowKind.CHANNEL, "42"); fail("Expected sign-in") } catch (_: NotLoggedInException) { }
     }
+
+    @Test fun channelUnfollowChecksTheAuthenticatedTargetStateBeforeRefreshingLists() = runTest {
+        server.enqueue(MockResponse().setBody(channelUnfollow))
+        server.enqueue(MockResponse().setBody("""{"data":{"user":{"self":{"follower":null}}}}"""))
+        api.unfollow(FollowKind.CHANNEL, "42")
+
+        val mutation = server.takeRequest()
+        val body = JSONObject(mutation.body.readUtf8())
+        assertEquals("OAuth old", mutation.getHeader("Authorization"))
+        assertEquals("tv-client", mutation.getHeader("Client-ID"))
+        assertEquals("UnfollowChannel", body.getString("operationName"))
+        assertEquals("42", body.getJSONObject("variables").getJSONObject("input").getString("targetID"))
+        val status = JSONObject(server.takeRequest().body.readUtf8())
+        assertEquals("42", status.getJSONObject("variables").getString("id"))
+        assertEquals(1L, changes.revision)
+    }
+
+    @Test fun categoryUnfollowRefreshesListsWhenTwitchConfirmsTheSameCategory() = runTest {
+        server.enqueue(MockResponse().setBody(categoryUnfollow))
+        api.unfollow(FollowKind.CATEGORY, "deadlock")
+
+        val body = JSONObject(server.takeRequest().body.readUtf8())
+        assertEquals("UnfollowCategory", body.getString("operationName"))
+        assertEquals("deadlock", body.getJSONObject("variables").getJSONObject("input").getString("gameID"))
+        assertEquals(1L, changes.revision)
+    }
+
+    @Test fun refusedOrUnconfirmedUnfollowKeepsTheRevisionAndCanBeRetried() = runTest {
+        server.enqueue(MockResponse().setBody("""{"errors":[{"message":"Unfollow refused"}]}"""))
+        server.enqueue(MockResponse().setBody(channelUnfollow))
+        server.enqueue(MockResponse().setBody("""{"data":{"user":{"self":{"follower":{"followedAt":"2026-11-01T00:00:00Z"}}}}}"""))
+        server.enqueue(MockResponse().setBody("""{"data":{"unfollowGame":{"game":{"id":"wrong"}}}}"""))
+        repeat(2) {
+            try { api.unfollow(FollowKind.CHANNEL, "42"); fail("Expected failure") } catch (_: IOException) { }
+        }
+        try { api.unfollow(FollowKind.CATEGORY, "deadlock"); fail("Expected failure") } catch (_: IOException) { }
+        assertEquals(0L, changes.revision)
+
+        server.enqueue(MockResponse().setBody(categoryUnfollow))
+        api.unfollow(FollowKind.CATEGORY, "deadlock")
+        assertEquals(1L, changes.revision)
+    }
+
+    @Test fun rejectsASecondUnfollowWhileTheFirstIsPending() = runTest {
+        server.enqueue(MockResponse().setBody(categoryUnfollow))
+        val first = async(start = CoroutineStart.UNDISPATCHED) {
+            api.unfollow(FollowKind.CATEGORY, "deadlock")
+        }
+        try {
+            api.unfollow(FollowKind.CHANNEL, "42")
+            fail("Expected the pending unfollow to block a second write")
+        } catch (_: IOException) { }
+        first.await()
+        assertEquals(1, server.requestCount)
+        assertEquals(1L, changes.revision)
+    }
+
+    @Test fun graphQlAuthenticationErrorRefreshesAndRetriesOnlyOnceBeforeRequiringLogin() = runTest {
+        val expired = """{"errors":[{"extensions":{"code":"Unauthenticated"}}],"data":{"unfollowGame":null}}"""
+        server.enqueue(MockResponse().setBody(expired))
+        server.enqueue(MockResponse().setBody("""{"access_token":"new","refresh_token":"new-refresh"}"""))
+        server.enqueue(MockResponse().setBody(expired))
+
+        try { api.unfollow(FollowKind.CATEGORY, "deadlock"); fail("Expected sign-in") } catch (_: NotLoggedInException) { }
+        val first = server.takeRequest()
+        assertEquals("/oauth2/token", server.takeRequest().requestUrl!!.encodedPath)
+        val retry = server.takeRequest()
+        assertEquals(first.body.readUtf8(), retry.body.readUtf8())
+        assertEquals("OAuth new", retry.getHeader("Authorization"))
+        assertEquals(0L, changes.revision)
+    }
+
+    private val channelUnfollow = """{"data":{"unfollowUser":{"__typename":"UnfollowUserPayload"}}}"""
+    private val categoryUnfollow = """{"data":{"unfollowGame":{"game":{"id":"deadlock"}}}}"""
 }

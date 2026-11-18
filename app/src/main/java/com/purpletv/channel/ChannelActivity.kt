@@ -33,6 +33,7 @@ class ChannelActivity : Activity() {
     private val app get() = PurpleApp.instance
     private var account: String? = null
     private var broadcasterId = ""
+    private var broadcasterName = ""
     private var avatar = ""
     private var live: Stream? = null
     private var job: Job? = null
@@ -79,7 +80,7 @@ class ChannelActivity : Activity() {
         if (app.tokens.userId != account) { openMain(Screen.FOLLOWING); return }
         if (app.tokens.accessToken == null) { requireLogin(); return }
         if (!loaded) load() else {
-            followButton.bind(FollowKind.CHANNEL, broadcasterId)
+            followButton.bind(FollowKind.CHANNEL, broadcasterId, broadcasterName)
             refreshLive()
         }
     }
@@ -93,7 +94,8 @@ class ChannelActivity : Activity() {
                 val user = app.helix.userByLogin(intent.getStringExtra(EXTRA_LOGIN).orEmpty())
                     ?: throw IOException("Channel unavailable")
                 broadcasterId = user.id
-                followButton.bind(FollowKind.CHANNEL, user.id)
+                broadcasterName = user.displayName.ifBlank { user.login }
+                followButton.bind(FollowKind.CHANNEL, broadcasterId, broadcasterName)
                 avatar = user.profileImageUrl
                 findViewById<TextView>(R.id.channel_name).text = user.displayName
                 if (avatar.isNotEmpty()) findViewById<ImageView>(R.id.channel_avatar).load(avatar) { transformations(CircleCropTransformation()) }

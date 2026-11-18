@@ -14,36 +14,46 @@ import com.purpletv.home.MainActivity
 import com.purpletv.home.Screen
 import com.purpletv.home.screenFrom
 import com.purpletv.player.ZapList
-import com.purpletv.twitch.sized
 import com.purpletv.twitch.FollowKind
-import com.purpletv.ui.FollowButton
+import com.purpletv.twitch.NotLoggedInException
+import com.purpletv.twitch.Stream
+import com.purpletv.twitch.collectPages
+import com.purpletv.twitch.sized
 import com.purpletv.ui.AvatarCache
+import com.purpletv.ui.FollowButton
 import com.purpletv.ui.GridAdapter
 import com.purpletv.ui.Nav
 import com.purpletv.ui.NavRail
 import com.purpletv.ui.Pager
 import com.purpletv.ui.RowItem
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.IOException
 
-/** The live streams of one category, most watched first, paged as the grid scrolls. */
+/** Followed streams first, then the category's most watched streams as the grid scrolls. */
 class CategoryActivity : Activity() {
     private val scope = MainScope()
+    private val app get() = PurpleApp.instance
+    private lateinit var pager: Pager<Stream>
+    private lateinit var updateStreams: (List<Stream>, Boolean) -> Unit
+    private var followedStreams = emptyList<Stream>()
+    private var followRevision: Long? = null
+    private var followUpdates: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_category)
-        val helix = PurpleApp.instance.helix
+        val helix = app.helix
         val avatars = AvatarCache(helix)
         val categoryId = intent.getStringExtra(EXTRA_ID).orEmpty()
         val name = intent.getStringExtra(EXTRA_NAME).orEmpty()
-        val app = PurpleApp.instance
-        FollowButton(findViewById(R.id.category_follow), scope, app.follows, { app.tokens.userId }, {
-            app.tokens.clearLogin()
-            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
-            finish()
-        }).bind(FollowKind.CATEGORY, categoryId)
+        val followView = findViewById<View>(R.id.category_follow)
+        FollowButton(followView, scope, app.follows, { app.tokens.userId }, ::requireLogin)
+            .bind(FollowKind.CATEGORY, categoryId, name)
         findViewById<TextView>(R.id.category_name).text = name
         findViewById<View>(R.id.category_art_frame).clipToOutline = true
         intent.getStringExtra(EXTRA_ART)?.takeIf { it.isNotEmpty() }?.let {
@@ -65,7 +75,6 @@ class CategoryActivity : Activity() {
 
         val grid: RecyclerView = findViewById(R.id.category_grid)
         val status: TextView = findViewById(R.id.category_status)
-        lateinit var pager: Pager<com.purpletv.twitch.Stream>
         lateinit var adapter: GridAdapter
         adapter = GridAdapter(COLUMNS, { item ->
             if (item is RowItem.StreamItem) {
@@ -76,17 +85,60 @@ class CategoryActivity : Activity() {
         adapter.attachTo(grid)
 
         var first = true
-        pager = Pager(scope, key = { it.userId }, fetch = { helix.topStreams(gameId = categoryId, cursor = it) }) { items, failed ->
+        updateStreams = { topStreams, failed ->
+            val items = (followedStreams + topStreams).distinctBy { it.userId }
             adapter.submitList(items.map { RowItem.StreamItem(it) })
             status.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
             status.setText(if (failed) R.string.row_error else R.string.category_empty)
             if (first && items.isNotEmpty()) {
                 first = false
-                grid.post { grid.layoutManager?.findViewByPosition(0)?.requestFocus() }
+                grid.post {
+                    if (!followView.hasFocus()) grid.layoutManager?.findViewByPosition(0)?.requestFocus()
+                }
             }
             scope.launch { runCatching { avatars.urls(items.map { it.userId }) }.getOrNull()?.let { adapter.avatars = it } }
         }
-        pager.loadMore()
+        pager = Pager(scope, key = { it.userId }, fetch = { helix.topStreams(gameId = categoryId, cursor = it) },
+            onAuthRequired = ::requireLogin, onPage = updateStreams)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        followUpdates = scope.launch {
+            app.followChanges.revisions.collectLatest { revision ->
+                if (revision == followRevision) return@collectLatest
+                val account = app.tokens.userId
+                val categoryId = intent.getStringExtra(EXTRA_ID)
+                try {
+                    val streams = if (account == null) emptyList() else {
+                        collectPages(key = Stream::userId) { app.helix.followedStreamsPage(account, it) }
+                    }
+                    ensureActive()
+                    if (app.tokens.userId != account) return@collectLatest
+                    followedStreams = streams.filter { it.gameId == categoryId }.sortedByDescending { it.viewers }
+                    followRevision = revision
+                } catch (_: NotLoggedInException) {
+                    requireLogin()
+                    return@collectLatest
+                } catch (_: IOException) {
+                    // The public category streams can still load if the followed list is unavailable.
+                    followedStreams = emptyList()
+                }
+                if (pager.hasLoaded) updateStreams(pager.currentItems, pager.hasFailed)
+                else pager.loadMore()
+            }
+        }
+    }
+
+    override fun onStop() {
+        followUpdates?.cancel()
+        super.onStop()
+    }
+
+    private fun requireLogin() {
+        app.tokens.clearLogin()
+        startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+        finish()
     }
 
     override fun onDestroy() {

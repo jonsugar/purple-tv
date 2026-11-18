@@ -106,11 +106,11 @@ login, retry a 401 after one token refresh, and report missing or restricted con
 network failures. Tokens and signed playback URLs are not written to logs.
 
 `FollowApi` reads channel follow status and all followed categories, including offline categories.
-It uses Twitch's `followUser` and `followGame` mutations with the existing signed-in TV client.
-The category header, channel page, and live player's heart button share one controller which shows
-the current state, prevents duplicate clicks, and leaves the state unchanged after a failed write.
-Successful writes increment a revision so Home and Following refresh when the user returns.
-These controls add follows only; they do not remove an existing follow.
+It adds and removes follows through Twitch GraphQL with the existing signed-in TV client. The
+category header, channel page, and live player's heart button use the same controller. It asks for
+confirmation before removing a follow, gives Cancel remote focus, and leaves the follow state as it
+was after a failed write. A confirmed change refreshes Home, Following, and the category stream
+order. The current stream keeps playing after an unfollow from the player.
 
 `RecordedPlayerActivity` uses the same SurfaceView and decoder policy as live playback, with its own
 controls. Focusing the timeline allows ten-second seeking; media transport keys also work. VOD
@@ -122,6 +122,9 @@ deployed build, use the 1280×720 virtual TV to check each Following tab, multip
 category navigation, Watch Live, every clip filter, VOD and clip seeking, quality changes, and VOD
 resume after restarting the app. Check Back restores the selected card, and try empty results,
 missing images, unavailable recordings, network failures, and signing in with another account.
+On a followed channel page, a followed category page, and in the live player, check the name in the
+unfollow dialog, Cancel focus, and focus restoration after Cancel or Back. Confirm a removal using
+a test follow and check the Follow control, the affected lists, continued playback, and re-following.
 
 ### Platform notes
 

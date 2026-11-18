@@ -1,5 +1,6 @@
 package com.purpletv.ui
 
+import android.app.AlertDialog
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -10,11 +11,13 @@ import com.purpletv.twitch.FollowKind
 import com.purpletv.twitch.NotLoggedInException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.IOException
 
-/** One request at a time. Existing follows are shown without offering an accidental unfollow. */
+/** One request at a time. Removing a follow requires confirmation. */
 class FollowButton(
     private val view: View,
     private val scope: CoroutineScope,
@@ -22,23 +25,39 @@ class FollowButton(
     private val account: () -> String?,
     private val onAuthRequired: () -> Unit,
     private val onLabelChanged: () -> Unit = {},
+    private val onConfirmationChanged: (Boolean) -> Unit = {},
 ) {
     private var job: Job? = null
     private var generation = 0
     private var target: Pair<FollowKind, String>? = null
+    private var targetName = ""
+    private var confirmation: AlertDialog? = null
     private var following = false
     private var busy = false
     private var known = false
     private var boundAccount: String? = null
 
     init {
-        view.setOnClickListener { if (!busy && !following) { if (known) follow() else load() } }
+        view.setOnClickListener {
+            if (busy || confirmation != null) return@setOnClickListener
+            when {
+                !known -> load()
+                following -> confirmUnfollow()
+                else -> writeFollow(follow = true)
+            }
+        }
+        view.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(view: View) = Unit
+            override fun onViewDetachedFromWindow(view: View) { confirmation?.dismiss() }
+        })
         render()
     }
 
-    fun bind(kind: FollowKind, id: String) {
-        if (target == (kind to id) && boundAccount == account() && job?.isActive == true) return
+    fun bind(kind: FollowKind, id: String, name: String) {
+        targetName = name
+        if (target == (kind to id) && boundAccount == account() && (busy || confirmation != null)) return
         generation++
+        confirmation?.dismiss()
         job?.cancel()
         target = kind to id
         boundAccount = account()
@@ -49,6 +68,7 @@ class FollowButton(
 
     fun clear() {
         generation++
+        confirmation?.dismiss()
         job?.cancel()
         target = null
         following = false
@@ -78,7 +98,28 @@ class FollowButton(
         }
     }
 
-    private fun follow() {
+    private fun confirmUnfollow() {
+        if (boundAccount == null || boundAccount != account()) { onAuthRequired(); return }
+        val request = generation
+        val dialog = AlertDialog.Builder(view.context, R.style.PurpleDialog)
+            .setTitle(view.context.getString(R.string.unfollow_title, targetName))
+            .setNegativeButton(R.string.logout_cancel, null)
+            .setPositiveButton(R.string.unfollow) { _, _ ->
+                if (request == generation && !busy && following) writeFollow(follow = false)
+            }
+            .create()
+        confirmation = dialog
+        dialog.setOnShowListener { dialog.getButton(AlertDialog.BUTTON_NEGATIVE).requestFocus() }
+        dialog.setOnDismissListener {
+            if (confirmation === dialog) confirmation = null
+            onConfirmationChanged(false)
+            if (request == generation && view.isShown) view.requestFocus()
+        }
+        onConfirmationChanged(true)
+        dialog.show()
+    }
+
+    private fun writeFollow(follow: Boolean) {
         val (kind, id) = target ?: return
         if (boundAccount == null || boundAccount != account()) { onAuthRequired(); return }
         val request = generation
@@ -86,14 +127,16 @@ class FollowButton(
         render()
         job = scope.launch {
             try {
-                api.follow(kind, id)
+                if (follow) api.follow(kind, id)
+                // The write may already have reached Twitch when the viewer leaves this screen.
+                else withContext(NonCancellable) { api.unfollow(kind, id) }
                 ensureActive()
                 if (request != generation || boundAccount != account()) return@launch
-                following = true
+                following = follow
             } catch (e: IOException) {
                 if (request != generation || boundAccount != account()) return@launch
                 if (e is NotLoggedInException) onAuthRequired()
-                else Toast.makeText(view.context, R.string.follow_error, Toast.LENGTH_LONG).show()
+                else Toast.makeText(view.context, if (follow) R.string.follow_error else R.string.unfollow_error, Toast.LENGTH_LONG).show()
             } finally {
                 if (request == generation) { busy = false; render() }
             }
@@ -108,7 +151,7 @@ class FollowButton(
             else -> R.string.follow
         })
         view.contentDescription = label
-        view.isClickable = target != null && !busy && !following
+        view.isClickable = target != null && !busy
         view.isSelected = following
         view.alpha = if (busy || target == null) 0.5f else 1f
         (view as? TextView)?.text = label
