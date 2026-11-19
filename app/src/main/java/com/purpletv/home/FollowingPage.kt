@@ -80,12 +80,12 @@ class FollowingPage(
     private var channelsLoadedAt = 0L
     private var followRevision = PurpleApp.instance.followChanges.revision
 
-    private val livePage: ContentGrid = ContentGrid(context, R.string.followed_empty) {
+    private val livePage: ContentGrid = ContentGrid(context, R.string.followed_empty, { tabs[0] }) {
         if (!live.hasLoaded || live.hasFailed) live.loadMore()
         if (ghostLiveFailed) refreshGhostLive()
     }
-    private val categoryPage: ContentGrid = ContentGrid(context, R.string.following_categories_empty) { categories.loadMore() }
-    private val channelPage: ContentGrid = ContentGrid(context, R.string.following_channels_empty) {
+    private val categoryPage: ContentGrid = ContentGrid(context, R.string.following_categories_empty, { tabs[1] }) { categories.loadMore() }
+    private val channelPage: ContentGrid = ContentGrid(context, R.string.following_channels_empty, { tabs[2] }) {
         if (ghostLiveFailed) refreshGhostLive()
         if (!channelsLoaded || channelListFailed) loadChannels() else {
             if (profilesFailed) { profilesFailed = false; ensureProfiles(profilesWanted) }

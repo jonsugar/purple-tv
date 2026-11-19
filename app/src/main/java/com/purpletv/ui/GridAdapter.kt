@@ -9,13 +9,11 @@ import androidx.recyclerview.widget.RecyclerView
 class GridAdapter(
     private val columns: Int,
     onClick: (RowItem) -> Unit,
-    private val firstRowFocusUpId: Int = View.NO_ID,
     private val onNearEnd: () -> Unit,
 ) : RowAdapter(onClick) {
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         super.onBindViewHolder(holder, position)
-        holder.card.nextFocusUpId = if (position < columns) firstRowFocusUpId else View.NO_ID
         if (nearEnd(position, itemCount, columns)) holder.card.post(onNearEnd)
     }
 

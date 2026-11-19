@@ -37,7 +37,8 @@ class BrowsePage(
     private val languageControl: TextView = view.findViewById(R.id.browse_language)
     private var language = streamPrefs.language.value
     private var liveAvatars: Job? = null
-    private val results: ContentGrid = ContentGrid(view.findViewById(R.id.browse_results), R.string.search_no_results) {
+    private val results: ContentGrid = ContentGrid(view.findViewById(R.id.browse_results), R.string.search_no_results,
+        focusAbove = { if (selected === tabLive) languageControl else tabCategories }) {
         if (selected === tabLive) live.loadMore() else categories.loadMore()
     }
     private val grid get() = results.grid
@@ -45,7 +46,7 @@ class BrowsePage(
     private val categoriesAdapter: GridAdapter = GridAdapter(CATEGORY_COLUMNS, ::open) {
         if (selected === tabCategories && !categories.hasFailed) categories.loadMore()
     }
-    private val liveAdapter: GridAdapter = GridAdapter(STREAM_COLUMNS, ::open, firstRowFocusUpId = languageControl.id) {
+    private val liveAdapter: GridAdapter = GridAdapter(STREAM_COLUMNS, ::open) {
         if (selected === tabLive && live.hasLoaded && !live.hasFailed) live.loadMore()
     }
 

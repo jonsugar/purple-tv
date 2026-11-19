@@ -96,7 +96,7 @@ class CategoryActivity : Activity() {
             app.streamPrefs.toggleLanguage()
             refreshLanguage()
         }
-        results = ContentGrid(findViewById(R.id.category_results), R.string.category_empty) {
+        results = ContentGrid(findViewById(R.id.category_results), R.string.category_empty, { languageControl }) {
             if (followedLoadFailed || ghostLoadFailed) observeFollowChanges()
             if (pager.hasFailed) pager.loadMore()
         }
@@ -106,7 +106,7 @@ class CategoryActivity : Activity() {
                 val zap = ZapList(name, adapter.currentList.filterIsInstance<RowItem.StreamItem>().map { it.stream })
                 Nav.openStream(this, item.stream.login, item.stream, adapter.avatars[item.stream.userId], zap)
             }
-        }, firstRowFocusUpId = languageControl.id) { if (pager.hasLoaded && !pager.hasFailed) pager.loadMore() }
+        }) { if (pager.hasLoaded && !pager.hasFailed) pager.loadMore() }
         adapter.attachTo(grid)
         results.loading()
 
