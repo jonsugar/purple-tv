@@ -115,7 +115,7 @@
             android:layout_height="3dp"
             android:layout_weight="1"
             android:indeterminate="true"
-            android:indeterminateTint="@color/purple"
+            android:indeterminateTint="@color/accent_gold"
             android:maxHeight="3dp"
             android:minHeight="3dp" />
 

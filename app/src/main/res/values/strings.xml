@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">Purple TV</string>
+    <string name="app_name" translatable="false">JonTV</string>
     <string name="stream_unavailable">%1$s is not available: %2$s</string>
 
     <string name="login_title">Sign in with your account</string>
@@ -102,7 +102,7 @@
     <string name="logout_confirm_message">To sign back in you will need a new code at twitch.tv/activate.</string>
     <string name="logout_cancel">Cancel</string>
     <string name="logout_confirm">Sign out</string>
-    <string name="app_version">Purple TV %1$s</string>
+    <string name="app_version">%1$s %2$s</string>
 
     <string name="player_back">Back</string>
     <string name="player_viewers">%1$s viewers</string>

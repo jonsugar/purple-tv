@@ -82,7 +82,7 @@
             <ProgressBar
                 android:layout_width="14dp"
                 android:layout_height="14dp"
-                android:indeterminateTint="@color/purple" />
+                android:indeterminateTint="@color/accent_gold" />
 
             <TextView
                 android:id="@+id/login_status"

@@ -100,7 +100,7 @@
     <string name="logout_confirm_message">Per rientrare servirà di nuovo il codice su twitch.tv/activate.</string>
     <string name="logout_cancel">Annulla</string>
     <string name="logout_confirm">Esci</string>
-    <string name="app_version">Purple TV %1$s</string>
+    <string name="app_version">%1$s %2$s</string>
 
     <string name="player_back">Indietro</string>
     <string name="player_viewers">%1$s spettatori</string>

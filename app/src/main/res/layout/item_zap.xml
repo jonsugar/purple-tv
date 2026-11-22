@@ -55,7 +55,7 @@
             android:layout_marginStart="6dp"
             android:singleLine="true"
             android:text="@string/zap_on_air"
-            android:textColor="@color/purple_light"
+            android:textColor="@color/accent_gold_light"
             android:textFontWeight="600"
             android:textSize="11sp"
             android:visibility="gone" />

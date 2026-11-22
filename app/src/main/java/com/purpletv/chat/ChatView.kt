@@ -24,6 +24,7 @@ class ChatView(context: Context, attrs: AttributeSet?) : LinearLayout(context, a
     private val lines = ArrayList<CharSequence>()
     private val pending = ArrayList<ChatMessage>()
     private val adapter = LineAdapter()
+    private val nameFallback = context.getColor(R.color.accent_gold_light)
     private lateinit var list: RecyclerView
 
     override fun onFinishInflate() {
@@ -66,7 +67,7 @@ class ChatView(context: Context, attrs: AttributeSet?) : LinearLayout(context, a
 
     private fun line(message: ChatMessage): CharSequence {
         // Twitch names keep their own colour, lightened where it would be too dark on the panel.
-        val color = readableNameColor(message.color)
+        val color = readableNameColor(message.color, nameFallback)
         return SpannableStringBuilder().apply {
             append(message.user, ForegroundColorSpan(color), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             setSpan(StyleSpan(Typeface.BOLD), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)

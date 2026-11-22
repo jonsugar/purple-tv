@@ -22,7 +22,7 @@
         android:drawablePadding="5dp"
         android:gravity="center_vertical"
         android:text="@string/debug_badge"
-        android:textColor="@color/purple_light"
+        android:textColor="@color/accent_gold_light"
         android:textSize="11sp"
         android:textStyle="bold" />
 

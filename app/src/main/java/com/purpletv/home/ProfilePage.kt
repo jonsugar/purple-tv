@@ -38,7 +38,8 @@ class ProfilePage(
             chat.text = chatLabel()
         }
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        view.findViewById<TextView>(R.id.profile_version).text = context.getString(R.string.app_version, version)
+        val appName = context.getString(R.string.app_name)
+        view.findViewById<TextView>(R.id.profile_version).text = context.getString(R.string.app_version, appName, version)
     }
 
     private fun openDebug(anchor: View) {

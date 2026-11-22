@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The check: light purple on the dark panel, the focus purple on the white focused row. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:color="@color/focus_purple" android:state_focused="true" />
-    <item android:color="@color/purple_light" />
+    <item android:color="@color/focus_gold_on_light" android:state_focused="true" />
+    <item android:color="@color/accent_gold_light" />
 </selector>

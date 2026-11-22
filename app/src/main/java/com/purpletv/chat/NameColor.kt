@@ -19,7 +19,7 @@ fun contrastRatio(a: Int, b: Int): Double {
  * reds, so those are mixed toward white in 10% steps until they reach a 4.5:1 contrast. No colour,
  * or one that is not `#RRGGBB`, gets [fallback].
  */
-fun readableNameColor(hex: String?, background: Int = 0xFF18181B.toInt(), fallback: Int = 0xFFBF94FF.toInt()): Int {
+fun readableNameColor(hex: String?, fallback: Int, background: Int = 0xFF18181B.toInt()): Int {
     if (hex == null || !HEX_COLOR.matches(hex)) return fallback
     val color = (0xFF000000 or hex.substring(1).toLong(16)).toInt()
     for (step in 0..MIX_STEPS) {

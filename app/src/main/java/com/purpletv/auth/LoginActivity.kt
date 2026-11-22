@@ -110,7 +110,7 @@ class LoginActivity : Activity() {
         val text = getString(R.string.login_step_open, host)
         val start = text.indexOf(host)
         return SpannableString(text).apply {
-            setSpan(ForegroundColorSpan(getColor(R.color.purple_light)), start, start + host.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            setSpan(ForegroundColorSpan(getColor(R.color.accent_gold_light)), start, start + host.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             setSpan(StyleSpan(Typeface.BOLD), start, start + host.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
     }
