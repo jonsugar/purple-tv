@@ -20,6 +20,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
@@ -163,7 +164,12 @@ class RecordedPlayerActivity : Activity() {
             override fun onTracksChanged(tracks: Tracks) {
                 if (!qualityApplied && kind == RecordingKind.VOD && vodQualities().isNotEmpty()) { qualityApplied = true; applyVodQuality(savedQuality(vodQualities())) }
             }
-            override fun onPlayerError(error: PlaybackException) { showError(error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS) }
+            override fun onPlayerError(error: PlaybackException) {
+                val status = generateSequence(error.cause) { it.cause }
+                    .filterIsInstance<InvalidResponseCodeException>()
+                    .firstOrNull()?.responseCode
+                showError(status == 403 || status == 404)
+            }
         })
         resolving = scope.launch {
             try {
