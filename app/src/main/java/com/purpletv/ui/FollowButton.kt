@@ -10,6 +10,7 @@ import com.purpletv.auth.SessionId
 import com.purpletv.auth.TokenStore
 import com.purpletv.twitch.FollowApi
 import com.purpletv.twitch.FollowKind
+import com.purpletv.twitch.FollowStatus
 import com.purpletv.twitch.NotLoggedInException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -91,11 +92,9 @@ class FollowButton(
         render()
         job = scope.launch {
             try {
-                val result = api.isFollowing(kind, id, session)
+                val status = api.status(kind, id, session)
                 ensureActive()
-                if (request != generation || !isBoundToCurrentSession()) return@launch
-                following = result
-                known = true
+                if (request == generation) tokens.runIfCurrent(session) { applyStatus(status) }
             } catch (e: IOException) {
                 if (request != generation || !isBoundToCurrentSession()) return@launch
                 if (e is NotLoggedInException) onAuthRequired(e)
@@ -135,12 +134,15 @@ class FollowButton(
         render()
         job = scope.launch {
             try {
-                if (follow) api.follow(kind, id, session)
-                // The write may already have reached Twitch when the viewer leaves this screen.
-                else withContext(NonCancellable) { api.unfollow(kind, id, session) }
+                val status = if (follow) {
+                    api.follow(kind, id, session)
+                    FollowStatus.FOLLOWING
+                } else {
+                    // The write may already have reached Twitch when the viewer leaves this screen.
+                    withContext(NonCancellable) { api.unfollow(kind, id, session) }
+                }
                 ensureActive()
-                if (request != generation || !isBoundToCurrentSession()) return@launch
-                following = follow
+                if (request == generation) tokens.runIfCurrent(session) { applyStatus(status) }
             } catch (e: IOException) {
                 if (request != generation || !isBoundToCurrentSession()) return@launch
                 if (e is NotLoggedInException) onAuthRequired(e)
@@ -149,6 +151,17 @@ class FollowButton(
                 finishRequest(request)
             }
         }
+    }
+
+    private fun applyStatus(status: FollowStatus) {
+        known = status != FollowStatus.UNFOLLOW_UNVERIFIED
+        following = status == FollowStatus.FOLLOWING || status == FollowStatus.STILL_FOLLOWING
+        val message = when (status) {
+            FollowStatus.UNFOLLOW_UNVERIFIED -> R.string.unfollow_unverified
+            FollowStatus.STILL_FOLLOWING -> R.string.unfollow_still_following
+            else -> return
+        }
+        Toast.makeText(view.context, message, Toast.LENGTH_LONG).show()
     }
 
     private fun finishRequest(request: Int) {

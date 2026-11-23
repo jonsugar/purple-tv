@@ -4,6 +4,59 @@ This is a native Android TV app that uses Kotlin and Android views. Preserve the
 colours, layouts, and remote focus behaviour. Read `docs/development.md` for the development workflow.
 Check the worktree before editing. Preserve unrelated changes.
 
+## Build and deploy to the virtual TV
+
+Use the existing `Television_720p` Android Virtual Device (AVD). Check the ADB device list first.
+
+```bash
+"$HOME/Library/Android/sdk/platform-tools/adb" devices -l
+```
+
+If the AVD is already running and the display works, use that instance. If its screen is black,
+close that instance before restarting it. The command below starts a visible window, skips Quick
+Boot snapshots, and uses software graphics. It preserves the AVD's data.
+
+```bash
+"$HOME/Library/Android/sdk/emulator/emulator" \
+  -avd Television_720p -port 5554 -no-snapshot -gpu swiftshader
+```
+
+Keep the emulator running. In a second Terminal or agent session, verify that `emulator-5554` is in
+state `device`, `emu avd name` reports `Television_720p`, and `sys.boot_completed` returns `1`.
+If ADB lists a different serial for this AVD, use that verified emulator serial throughout.
+
+```bash
+ADB="$HOME/Library/Android/sdk/platform-tools/adb"
+"$ADB" devices -l
+"$ADB" -s emulator-5554 emu avd name
+"$ADB" -s emulator-5554 shell getprop sys.boot_completed
+```
+
+From the project folder, run these commands in order. Check that Gradle succeeds and the install
+reports `Success` before opening the app. `install -r` keeps the emulator's app data. If Android
+reports a signing mismatch, follow [Signing and app data](#signing-and-app-data).
+
+```bash
+./gradlew testReleaseUnitTest assembleRelease
+"$ADB" -s emulator-5554 install -r app/build/outputs/apk/release/app-release.apk
+"$ADB" -s emulator-5554 shell am start -W -n com.purpletv/.home.MainActivity
+```
+
+Check that the app screen renders. If the emulator window is black after boot, press Home on the
+emulator to check whether the Android TV launcher renders. Use `adb exec-out screencap -p` with the
+verified serial to check what Android draws when the window is blank. For player changes, check
+that the shortcut renders live video. Use the login of a channel that is live at the time of the
+check.
+
+```bash
+"$ADB" -s emulator-5554 shell am start -n com.purpletv/.player.PlayerShortcutActivity \
+  --es channel twitchplayspokemon
+```
+
+After verification, use the `MainActivity` launch command again to leave the emulator running with
+Purple TV Home in the foreground. If the agent sandbox blocks ADB or access to the Gradle cache,
+use the permitted elevated execution path.
+
 ## TV connection
 
 The physical TV was a Sony BRAVIA at `192.168.1.129:5555` on 17 November 2026. Check its current IP

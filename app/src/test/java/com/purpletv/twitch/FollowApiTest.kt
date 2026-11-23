@@ -34,8 +34,8 @@ class FollowApiTest {
     @Test fun readsExistingAndMissingChannelFollowWithoutChangingAnything() = runTest {
         server.enqueue(MockResponse().setBody("""{"data":{"user":{"self":{"follower":{"followedAt":"2026-11-01T00:00:00Z"}}}}}"""))
         server.enqueue(MockResponse().setBody("""{"data":{"user":{"self":{"follower":null}}}}"""))
-        assertTrue(api.isFollowing(FollowKind.CHANNEL, "42"))
-        assertFalse(api.isFollowing(FollowKind.CHANNEL, "43"))
+        assertEquals(FollowStatus.FOLLOWING, api.status(FollowKind.CHANNEL, "42"))
+        assertEquals(FollowStatus.NOT_FOLLOWING, api.status(FollowKind.CHANNEL, "43"))
         val query = JSONObject(server.takeRequest().body.readUtf8())
         assertEquals("42", query.getJSONObject("variables").getString("id"))
         assertEquals(0L, changes.revision)
@@ -43,8 +43,8 @@ class FollowApiTest {
 
     @Test fun categoryStatusIncludesOfflineFollows() = runTest {
         repeat(2) { server.enqueue(MockResponse().setBody("""{"data":{"currentUser":{"followedGames":{"nodes":[{"id":"deadlock"}]}}}}""")) }
-        assertTrue(api.isFollowing(FollowKind.CATEGORY, "deadlock"))
-        assertFalse(api.isFollowing(FollowKind.CATEGORY, "other"))
+        assertEquals(FollowStatus.FOLLOWING, api.status(FollowKind.CATEGORY, "deadlock"))
+        assertEquals(FollowStatus.NOT_FOLLOWING, api.status(FollowKind.CATEGORY, "other"))
         assertTrue(JSONObject(server.takeRequest().body.readUtf8()).getString("query").contains("type:ALL"))
     }
 
@@ -98,13 +98,13 @@ class FollowApiTest {
 
     @Test fun anonymousStatusIsNotMistakenForNotFollowing() = runTest {
         server.enqueue(MockResponse().setBody("""{"data":{"user":{"self":null}}}"""))
-        try { api.isFollowing(FollowKind.CHANNEL, "42"); fail("Expected sign-in") } catch (_: NotLoggedInException) { }
+        try { api.status(FollowKind.CHANNEL, "42"); fail("Expected sign-in") } catch (_: NotLoggedInException) { }
     }
 
     @Test fun channelUnfollowChecksTheAuthenticatedTargetStateBeforeRefreshingLists() = runTest {
         server.enqueue(MockResponse().setBody(channelUnfollow))
         server.enqueue(MockResponse().setBody("""{"data":{"user":{"self":{"follower":null}}}}"""))
-        api.unfollow(FollowKind.CHANNEL, "42")
+        assertEquals(FollowStatus.NOT_FOLLOWING, api.unfollow(FollowKind.CHANNEL, "42"))
 
         val mutation = server.takeRequest()
         val body = JSONObject(mutation.body.readUtf8())
@@ -114,6 +114,22 @@ class FollowApiTest {
         assertEquals("42", body.getJSONObject("variables").getJSONObject("input").getString("targetID"))
         val status = JSONObject(server.takeRequest().body.readUtf8())
         assertEquals("42", status.getJSONObject("variables").getString("id"))
+        assertEquals(1L, changes.revision)
+    }
+
+    @Test fun retriesFailedVerificationOnceWithAReadOnlyQuery() = runTest {
+        server.enqueue(MockResponse().setBody(channelUnfollow))
+        server.enqueue(MockResponse().setBody("""{"data":{"user":{"self":{}}}}"""))
+        server.enqueue(MockResponse().setBody("""{"data":{"user":{"self":{"follower":null}}}}"""))
+
+        assertEquals(FollowStatus.NOT_FOLLOWING, api.unfollow(FollowKind.CHANNEL, "42"))
+
+        assertEquals(3, server.requestCount)
+        for (operation in listOf("UnfollowChannel", "ChannelFollowState", "ChannelFollowState")) {
+            val request = server.takeRequest()
+            assertEquals("OAuth old", request.getHeader("Authorization"))
+            assertEquals(operation, JSONObject(request.body.readUtf8()).getString("operationName"))
+        }
         assertEquals(1L, changes.revision)
     }
 
@@ -127,14 +143,15 @@ class FollowApiTest {
         assertEquals(1L, changes.revision)
     }
 
-    @Test fun refusedOrUnconfirmedUnfollowKeepsTheRevisionAndCanBeRetried() = runTest {
+    @Test fun refusedOrStillFollowedUnfollowKeepsTheRevision() = runTest {
         server.enqueue(MockResponse().setBody("""{"errors":[{"message":"Unfollow refused"}]}"""))
         server.enqueue(MockResponse().setBody(channelUnfollow))
         server.enqueue(MockResponse().setBody("""{"data":{"user":{"self":{"follower":{"followedAt":"2026-11-01T00:00:00Z"}}}}}"""))
         server.enqueue(MockResponse().setBody("""{"data":{"unfollowGame":{"game":{"id":"wrong"}}}}"""))
-        repeat(2) {
-            try { api.unfollow(FollowKind.CHANNEL, "42"); fail("Expected failure") } catch (_: IOException) { }
-        }
+        try { api.unfollow(FollowKind.CHANNEL, "42"); fail("Expected failure") } catch (_: IOException) { }
+        assertEquals(1, server.requestCount)
+        assertEquals(FollowStatus.STILL_FOLLOWING, api.unfollow(FollowKind.CHANNEL, "42"))
+        assertEquals(3, server.requestCount)
         try { api.unfollow(FollowKind.CATEGORY, "deadlock"); fail("Expected failure") } catch (_: IOException) { }
         assertEquals(0L, changes.revision)
 

@@ -3,6 +3,7 @@ package com.purpletv.auth
 import com.purpletv.twitch.FollowApi
 import com.purpletv.twitch.FollowChanges
 import com.purpletv.twitch.FollowKind
+import com.purpletv.twitch.FollowStatus
 import com.purpletv.twitch.HelixClient
 import com.purpletv.twitch.HomeApi
 import com.purpletv.twitch.NotLoggedInException
@@ -147,7 +148,7 @@ class AuthSessionRaceTest {
         respond(response(401))
         respond(response(400))
         val failure = try {
-            follows.isFollowing(FollowKind.CHANNEL, "target")
+            follows.status(FollowKind.CHANNEL, "target")
             error("Expected authentication failure")
         } catch (e: NotLoggedInException) {
             e
@@ -271,23 +272,30 @@ class AuthSessionRaceTest {
         assertStoredLogin("access-b", "refresh-b", "43")
     }
 
-    @Test fun aLateUnfollowStatusCheckDoesNotPublishDuringTheNewSession() = runTest {
+    @Test fun aLateUnfollowRetryDoesNotPublishDuringTheNewSession() = runTest {
         respond(response(body = UNFOLLOWED))
+        respond(response(503))
         val held = hold(response(body = """{"data":{"user":{"self":{"follower":null}}}}"""))
         val unfollow = async(start = CoroutineStart.UNDISPATCHED) {
             follows.unfollow(FollowKind.CHANNEL, "target")
         }
         assertEquals("OAuth access-a", nextRequest().getHeader("Authorization"))
-        val verification = nextRequest()
-        assertEquals("OAuth access-a", verification.getHeader("Authorization"))
-        assertTrue(verification.body.readUtf8().contains("ChannelFollowState"))
+        repeat(2) {
+            val verification = nextRequest()
+            assertEquals("OAuth access-a", verification.getHeader("Authorization"))
+            assertTrue(verification.body.readUtf8().contains("ChannelFollowState"))
+        }
         tokens.signIn("access-b", "refresh-b", "42")
         held.release()
 
         unfollow.assertSessionChanged()
         assertTrue(unpinned.isEmpty())
         assertEquals(0L, changes.revision)
-        assertEquals(2, server.requestCount)
+        assertEquals(3, server.requestCount)
+        respond(response(body = """{"data":{"user":{"self":{"follower":null}}}}"""))
+        assertEquals(FollowStatus.NOT_FOLLOWING, follows.status(FollowKind.CHANNEL, "target"))
+        assertTrue(unpinned.isEmpty())
+        assertEquals(0L, changes.revision)
     }
 
     @Test fun lateHome401UsesNoCredentialsFromTheNewSession() = runTest {

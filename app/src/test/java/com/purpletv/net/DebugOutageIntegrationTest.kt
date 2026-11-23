@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.net.Uri
 import android.os.Looper
+import android.view.View
 import android.widget.TextView
 import android.widget.LinearLayout
 import androidx.annotation.OptIn
@@ -19,6 +20,7 @@ import com.purpletv.R
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
 import com.purpletv.auth.signIn
+import com.purpletv.home.FavouritePin
 import com.purpletv.twitch.FollowApi
 import com.purpletv.twitch.FollowChanges
 import com.purpletv.twitch.FollowKind
@@ -50,6 +52,20 @@ import java.util.concurrent.TimeUnit.SECONDS
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class DebugOutageIntegrationTest {
+    @Test
+    fun uncertainChannelUnfollowCanBeCheckedAgainWithoutAnotherMutation() = checkChannelUnfollow(
+        finalStatus = """{"data":{"user":{"self":{"follower":null}}}}""",
+        expectedLabel = R.string.follow,
+        expectedRevision = 1L,
+    )
+
+    @Test
+    fun channelStillFollowedAfterRecheckKeepsItsPin() = checkChannelUnfollow(
+        finalStatus = channelFollowed,
+        expectedLabel = R.string.following_state,
+        expectedRevision = 0L,
+    )
+
     @Test
     fun unfollowFailsAfterFollowingWasReadAndSameControlCanRetry() {
         MockWebServer().use { server ->
@@ -186,6 +202,69 @@ class DebugOutageIntegrationTest {
         }
     }
 
+    private fun checkChannelUnfollow(finalStatus: String, expectedLabel: Int, expectedRevision: Long) {
+        MockWebServer().use { server ->
+            val app = RuntimeEnvironment.getApplication() as PurpleApp
+            val tokens = InMemoryTokenStore().apply { signIn("saved", "refresh", "42") }
+            val auth = DeviceAuth(app.http, "tv", "", tokens, server.url("/oauth2/").toString())
+            val changes = FollowChanges()
+            val api = FollowApi(TwitchGraphQl(app.http, auth, server.url("/gql").toString()), changes, app.pins::remove)
+            val scope = MainScope()
+            val activity = Robolectric.buildActivity(Activity::class.java).setup()
+            val button = TextView(activity.get()).apply { isFocusableInTouchMode = true }
+            val pin = TextView(activity.get())
+            activity.get().setContentView(LinearLayout(activity.get()).apply { addView(button); addView(pin) })
+            val target = FavouritePin("84", "Channel")
+            try {
+                app.pins.add("42", FollowKind.CHANNEL, target)
+                server.enqueue(MockResponse().setBody(channelFollowed))
+                FollowButton(button, scope, api, tokens, { fail("Unexpected login request") },
+                    pinButton = PinButton(pin, button, app.pins) { tokens.userId })
+                    .bind(FollowKind.CHANNEL, target.id, target.name)
+                waitUntil { button.text == app.getString(R.string.following_state) }
+                assertEquals(app.getString(R.string.unpin), pin.text)
+
+                assertTrue(button.performClick())
+                val confirmation = ShadowAlertDialog.getLatestAlertDialog()
+                waitUntil { confirmation.getButton(AlertDialog.BUTTON_NEGATIVE).hasFocus() }
+                server.enqueue(MockResponse().setBody("""{"data":{"unfollowUser":{"__typename":"UnfollowUserPayload"}}}"""))
+                repeat(2) { server.enqueue(MockResponse().setResponseCode(503)) }
+                confirmation.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+                waitUntil { button.text == app.getString(R.string.follow_retry) }
+                assertEquals(app.getString(R.string.unfollow_unverified), ShadowToast.getTextOfLatestToast())
+                assertTrue(button.isClickable)
+                assertFalse(button.isSelected)
+                assertEquals(listOf(target), app.pins.list("42", FollowKind.CHANNEL))
+                assertEquals(0L, changes.revision)
+                assertEquals(4, server.requestCount)
+
+                server.enqueue(MockResponse().setBody(finalStatus))
+                assertTrue(button.performClick())
+                waitUntil { button.text == app.getString(expectedLabel) }
+                assertEquals(expectedRevision, changes.revision)
+                if (expectedLabel == R.string.follow) {
+                    assertTrue(app.pins.list("42", FollowKind.CHANNEL).isEmpty())
+                    assertEquals(View.GONE, pin.visibility)
+                } else {
+                    assertEquals(listOf(target), app.pins.list("42", FollowKind.CHANNEL))
+                    assertEquals(app.getString(R.string.unpin), pin.text)
+                    assertEquals(app.getString(R.string.unfollow_still_following), ShadowToast.getTextOfLatestToast())
+                }
+                assertEquals(5, server.requestCount)
+                val operations = listOf("ChannelFollowState", "UnfollowChannel", "ChannelFollowState",
+                    "ChannelFollowState", "ChannelFollowState")
+                for (operation in operations) {
+                    val request = server.takeRequest(1, SECONDS)!!
+                    assertEquals("OAuth saved", request.getHeader("Authorization"))
+                    assertEquals(operation, JSONObject(request.body.readUtf8()).getString("operationName"))
+                }
+            } finally {
+                scope.cancel()
+                activity.pause().stop().destroy()
+            }
+        }
+    }
+
     private fun waitUntil(condition: () -> Boolean) {
         val deadline = System.nanoTime() + SECONDS.toNanos(5)
         while (System.nanoTime() < deadline) {
@@ -195,4 +274,6 @@ class DebugOutageIntegrationTest {
         }
         fail("Timed out waiting for the main thread to show the result")
     }
+
+    private val channelFollowed = """{"data":{"user":{"self":{"follower":{"followedAt":"2026-11-01T00:00:00Z"}}}}}"""
 }

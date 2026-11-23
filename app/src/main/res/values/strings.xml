@@ -31,6 +31,8 @@
     <string name="unfollow">Unfollow</string>
     <string name="unfollow_title">Unfollow %1$s?</string>
     <string name="unfollow_error">Couldn’t unfollow. Please try again.</string>
+    <string name="unfollow_unverified">Couldn’t verify the unfollow. Check the follow status again.</string>
+    <string name="unfollow_still_following">You’re still following this channel.</string>
     <string name="following_tab_live">Live</string>
     <string name="following_live_categories">Live categories</string>
     <string name="following_followed_channels">Followed channels</string>
