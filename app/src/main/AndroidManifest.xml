@@ -27,10 +27,15 @@
             </intent-filter>
         </activity>
 
-        <!-- Exported so tools/install.sh can open a channel directly with its start option. -->
         <activity
             android:name=".player.PlayerActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize"
+            android:exported="false" />
+
+        <!-- Channel-only entry point for tools/install.sh. -->
+        <activity
+            android:name=".player.PlayerShortcutActivity"
+            android:theme="@android:style/Theme.NoDisplay"
             android:exported="true" />
 
         <activity

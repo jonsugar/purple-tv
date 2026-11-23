@@ -28,6 +28,15 @@ the ADB client of [CleanYourTV](https://github.com/Gathin23/cleanyourtv), expect
 TV's address. `tools/install.sh --start <channel>` also opens a channel in the player, and
 `tools/tv.sh '<command>'` runs a shell command on the TV.
 
+To open a channel on an authorized emulator, use the channel-only shortcut:
+
+```bash
+adb -s emulator-5554 shell am start -n com.purpletv/.player.PlayerShortcutActivity --es channel twitch
+```
+
+Use a Twitch login of 1–25 ASCII letters, digits, or underscores. The shortcut accepts a `channel`
+string and the app loads stream details. `PlayerActivity` is internal to the app.
+
 An app installed from a computer runs uncompiled until Android compiles it in the background, usually
 overnight, so `install.sh` compiles it right after installing.
 

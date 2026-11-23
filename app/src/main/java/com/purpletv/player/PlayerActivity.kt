@@ -81,6 +81,7 @@ class PlayerActivity : Activity() {
     private val retry = RetryPolicy()
 
     private var login = ""
+    private var resolveShortcutTune = false
     private lateinit var zap: ZapList
     private lateinit var playerView: PlayerView
     private lateinit var stage: View
@@ -109,6 +110,7 @@ class PlayerActivity : Activity() {
     private var player: ExoPlayer? = null
     private var trackSelector: DefaultTrackSelector? = null
     private var resolving: Job? = null
+    private var loadingStreamInfo: Job? = null
     private var attempts = 0
     private var qualityApplied = false
     private var bufferingSince = 0L
@@ -120,6 +122,7 @@ class PlayerActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
         login = intent.getStringExtra(EXTRA_CHANNEL).orEmpty().trim().lowercase()
+        resolveShortcutTune = intent.getBooleanExtra(EXTRA_SHORTCUT, false)
         playerView = findViewById(R.id.player_view)
         stage = findViewById(R.id.player_stage)
         overlay = findViewById(R.id.info_overlay)
@@ -155,7 +158,8 @@ class PlayerActivity : Activity() {
         ghostView.nextFocusUpId = R.id.overlay_back
         ghostView.nextFocusLeftId = R.id.overlay_follow
         ghostView.nextFocusRightId = R.id.overlay_ghost_follow
-        val source = app.zap ?: ZapList(getString(R.string.row_followed), app.snapshot.followedLive)
+        val cardRow = if (resolveShortcutTune) null else app.zap
+        val source = cardRow ?: ZapList(getString(R.string.row_followed), app.snapshot.followedLive)
         zap = source.copy(streams = app.streamPrefs.language.value.filter(source.streams))
         zapButton.visibility = if (zap.isEmpty()) View.GONE else View.VISIBLE
         chatButton.nextFocusRightId = if (zap.isEmpty()) R.id.overlay_follow else R.id.overlay_zap
@@ -323,6 +327,7 @@ class PlayerActivity : Activity() {
         ui.removeCallbacks(logStats)
         ui.removeCallbacks(autoHide)
         resolving?.cancel()
+        loadingStreamInfo?.cancel()
         playerView.player = null
         player?.release()
         player = null
@@ -559,14 +564,21 @@ class PlayerActivity : Activity() {
 
     private fun loadStreamInfo() {
         val requestedLogin = login
-        scope.launch {
-            val live = runCatching { app.helix.streamByLogin(requestedLogin) }.getOrNull() ?: return@launch
-            if (login != requestedLogin) return@launch
+        loadingStreamInfo = scope.launch {
+            val live = try {
+                app.helix.streamByLogin(requestedLogin)
+            } catch (_: IOException) {
+                null
+            } ?: return@launch
             stream = live
             followButton.bind(FollowKind.CHANNEL, live.userId, live.displayName.ifBlank { live.login })
             ghostButton.bind(live.userId, live.login, live.displayName)
-            val avatar = runCatching { AvatarCache(app.helix).urls(listOf(live.userId))[live.userId] }.getOrNull()
-            if (login != requestedLogin) return@launch
+            val avatar = try {
+                AvatarCache(app.helix).urls(listOf(live.userId))[live.userId]
+            } catch (_: IOException) {
+                null
+            }
+            if (resolveShortcutTune && layer == PlayerLayer.TUNING) bindTune(live.toTuneInfo(avatar))
             avatar?.let {
                 findViewById<ImageView>(R.id.info_avatar).load(it) { transformations(CircleCropTransformation()) }
             }
@@ -686,6 +698,7 @@ class PlayerActivity : Activity() {
         hideOverlay()
         if (target.login.equals(login, ignoreCase = true)) return
         login = target.login.lowercase()
+        resolveShortcutTune = false
         followButton.clear()
         followButton.bind(FollowKind.CHANNEL, target.userId, target.displayName.ifBlank { target.login })
         ghostButton.bind(target.userId, target.login, target.displayName)
@@ -740,6 +753,7 @@ class PlayerActivity : Activity() {
 
     companion object {
         const val EXTRA_CHANNEL = "channel"
+        internal const val EXTRA_SHORTCUT = "player_shortcut"
         const val EXTRA_NAME = "tune_name"
         const val EXTRA_TITLE = "tune_title"
         const val EXTRA_GAME = "tune_game"

@@ -33,5 +33,5 @@ esac
 "$PY" -I "$CLEANYOURTV/tools/tv.py" 'cmd package compile -m speed -f com.purpletv' > /dev/null
 
 if [ -n "$CHANNEL" ]; then
-  "$PY" -I "$CLEANYOURTV/tools/tv.py" "am start -n com.purpletv/.player.PlayerActivity --es channel $CHANNEL"
+  "$PY" -I "$CLEANYOURTV/tools/tv.py" "am start -n com.purpletv/.player.PlayerShortcutActivity --es channel $CHANNEL"
 fi
