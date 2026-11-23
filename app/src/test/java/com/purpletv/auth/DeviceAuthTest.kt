@@ -1,5 +1,6 @@
 package com.purpletv.auth
 
+import com.purpletv.net.TwitchResponseException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.currentTime
@@ -8,6 +9,7 @@ import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,6 +27,8 @@ class DeviceAuthTest {
     private lateinit var auth: DeviceAuth
 
     private val code = DeviceCode("d", "ABCD1234", "https://www.twitch.tv/activate", 1800, 5)
+    private val startBody =
+        """{"device_code":"d","user_code":"ABCD1234","verification_uri":"https://www.twitch.tv/activate","expires_in":1800,"interval":5}"""
 
     @Before
     fun setUp() {
@@ -47,8 +51,7 @@ class DeviceAuthTest {
 
     @Test
     fun startPostsClientIdAndScope() = runTest {
-        server.enqueue(MockResponse().setBody(
-            """{"device_code":"d","user_code":"ABCD1234","verification_uri":"https://www.twitch.tv/activate","expires_in":1800,"interval":5}"""))
+        server.enqueue(MockResponse().setBody(startBody))
 
         val result = auth.start()
 
@@ -59,6 +62,22 @@ class DeviceAuthTest {
         assertEquals(CLIENT_ID, form["client_id"])
         assertEquals("user:read:follows", form["scopes"])
         assertEquals(code, result)
+    }
+
+    @Test
+    fun startRejectsInvalidSuccessfulResponses() = runTest {
+        val invalidFields = listOf(
+            "device_code" to JSONObject.NULL,
+            "user_code" to " ",
+            "verification_uri" to "invalid-uri",
+            "expires_in" to 0,
+            "interval" to "5",
+        ).map { (key, value) -> JSONObject(startBody).put(key, value).toString() }
+
+        for (body in listOf("", """{"sensitive":"value"""", "[]", "{}", "$startBody{}") + invalidFields) {
+            server.enqueue(MockResponse().setBody(body))
+            expectResponseError { auth.start() }
+        }
     }
 
     @Test
@@ -103,6 +122,30 @@ class DeviceAuthTest {
     }
 
     @Test
+    fun pollRejectsIncompleteTokensWithoutChangingCredentials() = runTest {
+        tokens.accessToken = "old-access"
+        tokens.refreshToken = "old-refresh"
+        tokens.userId = "42"
+
+        val invalidBodies = listOf(
+            "",
+            """{"access_token":""",
+            """{"access_token":"new-access"}""",
+            """{"access_token":null,"refresh_token":"new-refresh"}""",
+            """{"access_token":"new-access","refresh_token":false}""",
+            """{"access_token":"new-access","refresh_token":" "}""",
+            """{"access_token":"new\naccess","refresh_token":"new-refresh"}""",
+        )
+        for (body in invalidBodies) {
+            server.enqueue(MockResponse().setBody(body))
+            expectResponseError { auth.poll(code) }
+            assertEquals("old-access", tokens.accessToken)
+            assertEquals("old-refresh", tokens.refreshToken)
+            assertEquals("42", tokens.userId)
+        }
+    }
+
+    @Test
     fun refreshStoresNewTokens() = runTest {
         tokens.refreshToken = "r"
         server.enqueue(MockResponse().setBody("""{"access_token":"a2","refresh_token":"r2"}"""))
@@ -116,6 +159,32 @@ class DeviceAuthTest {
         assertFalse(form.containsKey("client_secret"))
         assertEquals("a2", tokens.accessToken)
         assertEquals("r2", tokens.refreshToken)
+    }
+
+    @Test
+    fun refreshKeepsTheExistingRefreshTokenWhenOmitted() = runTest {
+        tokens.accessToken = "a"
+        tokens.refreshToken = "r"
+        server.enqueue(MockResponse().setBody("""{"access_token":"a2"}"""))
+
+        assertTrue(auth.refresh("a"))
+        assertEquals("a2", tokens.accessToken)
+        assertEquals("r", tokens.refreshToken)
+    }
+
+    @Test
+    fun refreshRejectsInvalidTokensWithoutChangingCredentials() = runTest {
+        tokens.accessToken = "a"
+        tokens.refreshToken = "r"
+        tokens.userId = "42"
+
+        for (body in listOf("""{"refresh_token":"r2"}""", """{"access_token":"a2","refresh_token":null}""")) {
+            server.enqueue(MockResponse().setBody(body))
+            expectResponseError { auth.refresh("a") }
+            assertEquals("a", tokens.accessToken)
+            assertEquals("r", tokens.refreshToken)
+            assertEquals("42", tokens.userId)
+        }
     }
 
     @Test
@@ -146,6 +215,16 @@ class DeviceAuthTest {
     }
 
     private fun currentTime(scope: TestScope) = scope.currentTime
+
+    private suspend fun expectResponseError(call: suspend () -> Unit) {
+        try {
+            call()
+            fail("expected TwitchResponseException")
+        } catch (e: TwitchResponseException) {
+            assertEquals("Unexpected Twitch response", e.message)
+            assertNull(e.cause)
+        }
+    }
 
     private companion object {
         const val CLIENT_ID = "your-twitch-client-id"

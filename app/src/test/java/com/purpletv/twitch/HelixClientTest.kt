@@ -2,6 +2,7 @@ package com.purpletv.twitch
 
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
+import com.purpletv.net.TwitchResponseException
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -50,6 +51,46 @@ class HelixClientTest {
         assertEquals("42", url.queryParameter("user_id"))
         assertEquals("100", url.queryParameter("first"))
         assertEquals("pgl", streams.single().login)
+    }
+
+    @Test
+    fun profileAllowsMissingAndNullOptionalFields() = runTest {
+        server.enqueue(MockResponse().setBody(
+            """{"data":[{"id":"42","login":"pgl","profile_image_url":null}]}"""))
+
+        assertEquals(User("42", "pgl", "", "", ""), helix.me())
+    }
+
+    @Test
+    fun invalidSuccessfulProfilesUseTheResponseErrorPath() = runTest {
+        tokens.userId = "42"
+        val invalidBodies = listOf(
+            "",
+            """{"data":[""",
+            "[]",
+            "{}",
+            """{"data":null}""",
+            """{"data":{}}""",
+            """{"data":[]}""",
+            """{"data":[null]}""",
+            """{"data":[{"login":"pgl"}]}""",
+            """{"data":[{"id":"42","login":" "}]}""",
+            """{"data":[{"id":42,"login":"pgl"}]}""",
+        )
+        for (body in invalidBodies) {
+            server.enqueue(MockResponse().setBody(body))
+            try {
+                helix.me()
+                fail("expected TwitchResponseException")
+            } catch (e: TwitchResponseException) {
+                assertEquals("Unexpected Twitch response", e.message)
+                assertNull(e.cause)
+                assertEquals("a", tokens.accessToken)
+                assertEquals("r", tokens.refreshToken)
+                assertEquals("42", tokens.userId)
+            }
+        }
+        assertEquals(invalidBodies.size, server.requestCount)
     }
 
     @Test
@@ -176,10 +217,27 @@ class HelixClientTest {
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"status":400,"message":"Invalid refresh token"}"""))
 
         try {
-            helix.followedStreams("42")
+            helix.me()
             fail("expected NotLoggedInException")
         } catch (e: NotLoggedInException) {
             assertNull(tokens.accessToken)
+        }
+    }
+
+    @Test
+    fun invalidRefreshResponseLeavesTheProfileSessionIntact() = runTest {
+        tokens.userId = "42"
+        server.enqueue(MockResponse().setResponseCode(401))
+        server.enqueue(MockResponse().setBody("""{"access_token":"a2","refresh_token":null}"""))
+
+        try {
+            helix.me()
+            fail("expected TwitchResponseException")
+        } catch (e: TwitchResponseException) {
+            assertEquals("a", tokens.accessToken)
+            assertEquals("r", tokens.refreshToken)
+            assertEquals("42", tokens.userId)
+            assertEquals(2, server.requestCount)
         }
     }
 

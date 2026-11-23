@@ -1,9 +1,10 @@
 package com.purpletv.twitch
 
-import org.json.JSONArray
+import com.purpletv.net.TwitchResponseException
+import com.purpletv.net.decodeTwitchObject
 import org.json.JSONObject
 
-/** Helix responses to models. Missing or null fields become "" or 0, never an exception. */
+/** Decodes Helix responses. Missing or null optional fields become "" or 0. */
 object HelixParser {
 
     fun followedChannels(json: String): Page<FollowedChannel> = page(json) {
@@ -40,15 +41,16 @@ object HelixParser {
         Category(id = it.str("id"), name = it.str("name"), boxArtTemplate = it.str("box_art_url"))
     }
 
-    fun users(json: String): List<User> = page(json) {
-        User(
-            id = it.str("id"),
-            login = it.str("login"),
-            displayName = it.str("display_name"),
-            profileImageUrl = it.str("profile_image_url"),
-            offlineImageUrl = it.str("offline_image_url"),
-        )
-    }.items
+    fun profile(json: String): User {
+        val data = decodeTwitchObject(json).data()
+        if (data.length() != 1) throw TwitchResponseException()
+        val profile = data.optJSONObject(0) ?: throw TwitchResponseException()
+        val user = user(profile)
+        if (user.id.isBlank() || user.login.isBlank()) throw TwitchResponseException()
+        return user
+    }
+
+    fun users(json: String): List<User> = page(json, ::user).items
 
     fun channels(json: String): List<ChannelResult> = page(json) {
         ChannelResult(
@@ -62,12 +64,22 @@ object HelixParser {
     }.items
 
     private fun <T> page(json: String, item: (JSONObject) -> T): Page<T> {
-        val root = JSONObject(json)
-        val data = root.optJSONArray("data") ?: JSONArray()
+        val root = decodeTwitchObject(json)
+        val data = root.data()
         val items = (0 until data.length()).mapNotNull { data.optJSONObject(it)?.let(item) }
         val cursor = root.optJSONObject("pagination")?.str("cursor")?.ifEmpty { null }
         return Page(items, cursor)
     }
+
+    private fun JSONObject.data() = optJSONArray("data") ?: throw TwitchResponseException()
+
+    private fun user(item: JSONObject) = User(
+        id = (item.opt("id") as? String).orEmpty(),
+        login = (item.opt("login") as? String).orEmpty(),
+        displayName = item.str("display_name"),
+        profileImageUrl = item.str("profile_image_url"),
+        offlineImageUrl = item.str("offline_image_url"),
+    )
 
     /** org.json turns a JSON null into the string "null"; this keeps it empty. */
     private fun JSONObject.str(key: String): String = if (isNull(key)) "" else optString(key)

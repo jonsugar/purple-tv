@@ -2,6 +2,7 @@ package com.purpletv.twitch
 
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
+import com.purpletv.net.TwitchResponseException
 import kotlinx.coroutines.test.runTest
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -14,7 +15,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
-import java.io.IOException
 
 class PlaybackApiTest {
     private val server = MockWebServer()
@@ -165,14 +165,54 @@ class PlaybackApiTest {
     }
 
     @Test
-    fun throwsWhenTokenMissing() = runTest {
-        server.enqueue(MockResponse().setBody("""{"data":{"streamPlaybackAccessToken":null}}"""))
+    fun invalidAnonymousTokenResponsesFailBeforeRequestingAPlaylist() = runTest {
+        val invalidBodies = listOf(
+            "",
+            """{"data":""",
+            "[]",
+            """{"data":{"streamPlaybackAccessToken":null}}""",
+            """{"data":{"streamPlaybackAccessToken":{"value":"opaque-token"}}}""",
+            """{"data":{"streamPlaybackAccessToken":{"value":"opaque-token","signature":" "}}}""",
+            """{"data":{"streamPlaybackAccessToken":{"signature":"sig"}}}""",
+            """{"data":{"streamPlaybackAccessToken":{"value":false,"signature":"sig"}}}""",
+        )
+        for (body in invalidBodies) {
+            server.enqueue(MockResponse().setBody(body))
+            expectResponseError()
+        }
+        assertEquals(invalidBodies.size, server.requestCount)
+    }
 
+    @Test
+    fun invalidSignedInResponsesAreNeitherOfflineNorAuthRefusals() = runTest {
+        tokens.accessToken = "secret"
+        tokens.refreshToken = "refresh"
+        val invalidBodies = listOf(
+            """{"data":{"user":null}}""",
+            """{"data":{"user":{}}}""",
+            """{"data":{"user":{"stream":[]}}}""",
+            """{"data":{"user":{"stream":null}},"errors":[{"message":"stream lookup failed"}]}""",
+            """{"data":{"user":{"stream":{"playbackAccessToken":{"value":null,"signature":"sig"}}}}}""",
+        )
+        for (body in invalidBodies) {
+            server.enqueue(MockResponse().setBody(body))
+            expectResponseError()
+        }
+        assertEquals(invalidBodies.size, server.requestCount)
+        assertEquals("secret", tokens.accessToken)
+        assertEquals("refresh", tokens.refreshToken)
+    }
+
+    private suspend fun expectResponseError() {
         try {
-            api.liveStreamUrl("nobody")
-            fail("expected IOException")
-        } catch (e: IOException) {
-            assertTrue(e !is StreamOfflineException)
+            api.liveStreamUrl("pgl")
+            fail("expected TwitchResponseException")
+        } catch (e: TwitchResponseException) {
+            // Coroutine stack-trace recovery can wrap the original exception in a copy.
+            for (cause in generateSequence<Throwable>(e) { it.cause }) {
+                assertEquals(TwitchResponseException::class.java, cause.javaClass)
+                assertEquals("Unexpected Twitch response", cause.message)
+            }
         }
     }
 

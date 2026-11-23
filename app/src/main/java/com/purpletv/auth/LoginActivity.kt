@@ -62,7 +62,7 @@ class LoginActivity : Activity() {
             } catch (e: DeviceCodeExpiredException) {
                 // Next round asks for a fresh code.
             } catch (e: IOException) {
-                // The message carries only the HTTP status, never a token.
+                // Response errors contain sanitized diagnostics.
                 Log.w(TAG, "device login (${auth.clientId.take(4)}…): ${e.message}")
                 countdown?.cancel()
                 status.setText(R.string.login_network_error)

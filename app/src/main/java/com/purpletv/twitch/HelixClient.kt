@@ -21,7 +21,7 @@ class HelixClient(
 ) {
     private val base = baseUrl.toHttpUrl()
 
-    suspend fun me(): User = HelixParser.users(get("users")).firstOrNull() ?: throw NotLoggedInException()
+    suspend fun me(): User = HelixParser.profile(get("users"))
 
     suspend fun users(ids: List<String>): List<User> = ids.chunked(MAX_IDS).flatMap { chunk ->
         HelixParser.users(get("users", chunk.map { "id" to it }))
