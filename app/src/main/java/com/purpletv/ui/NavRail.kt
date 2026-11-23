@@ -5,10 +5,11 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import coil.load
-import coil.transform.CircleCropTransformation
 import com.purpletv.R
+import com.purpletv.home.HomeSnapshot
 import com.purpletv.home.Screen
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * The left navigation rail: icons only, widening to show labels while it holds the focus.
@@ -27,6 +28,7 @@ class NavRail(private val rail: LinearLayout, private val onSelect: (Screen) -> 
     private val density = rail.resources.displayMetrics.density
     private var expanded = false
     private var current = Screen.HOME
+    private var avatarUrl: String? = null
 
     init {
         items.forEach { (screen, view) -> view.setOnClickListener { onSelect(screen) } }
@@ -54,10 +56,21 @@ class NavRail(private val rail: LinearLayout, private val onSelect: (Screen) -> 
         items[screen]?.requestFocus()
     }
 
-    fun setAvatar(url: String) {
+    fun setAvatar(url: String?) {
+        if (url == avatarUrl) return
+        avatarUrl = url
         rail.findViewById<ImageView>(R.id.nav_avatar).apply {
             clipToOutline = true
-            load(url) { transformations(CircleCropTransformation()) }
+            loadAccountAvatar(url)
+        }
+    }
+
+    fun observeAvatar(scope: CoroutineScope, snapshot: HomeSnapshot) {
+        setAvatar(snapshot.current.profile?.profileImageUrl)
+        scope.launch {
+            snapshot.updates.collect {
+                setAvatar(snapshot.current.profile?.profileImageUrl)
+            }
         }
     }
 

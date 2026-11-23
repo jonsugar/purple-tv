@@ -2,6 +2,9 @@ package com.purpletv.auth
 
 import android.content.SharedPreferences
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import okhttp3.Call
 
@@ -24,6 +27,7 @@ class LoginSession(val id: SessionId, val tokens: LoginTokens, val userId: Strin
 /** The credentials the app keeps. Tokens are never logged or shown. */
 interface TokenStore {
     val session: LoginSession
+    val sessionIds: StateFlow<SessionId>
     val accessToken get() = session.accessToken
     val refreshToken get() = session.refreshToken
     val userId get() = session.userId
@@ -45,6 +49,8 @@ class PrefsTokenStore(private val prefs: SharedPreferences) : TokenStore {
         SessionId(), LoginTokens(prefs.getString(ACCESS, null), prefs.getString(REFRESH, null)),
         prefs.getString(USER_ID, null),
     )
+    private val identities = MutableStateFlow(current.id)
+    override val sessionIds = identities.asStateFlow()
 
     init {
         // An earlier build kept the twitch.tv auth-token cookie here; no build reads it now.
@@ -85,6 +91,7 @@ class PrefsTokenStore(private val prefs: SharedPreferences) : TokenStore {
         if (previous !== next.id) {
             previous.calls.forEach(Call::cancel)
             previous.calls.clear()
+            identities.value = next.id
         }
         prefs.edit().apply {
             putOrRemove(ACCESS, next.accessToken)

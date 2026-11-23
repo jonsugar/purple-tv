@@ -21,9 +21,11 @@ import com.purpletv.twitch.TwitchGraphQl
 import com.purpletv.twitch.FollowApi
 import com.purpletv.twitch.FollowChanges
 import com.purpletv.twitch.PlaybackApi
-import com.purpletv.player.ZapList
+import com.purpletv.player.PlayerLaunchRows
 import com.purpletv.twitch.deviceId
 import com.purpletv.ui.DebugIndicator
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
 /** Holds the app-wide singletons; screens reach them through [instance]. */
@@ -31,6 +33,7 @@ class PurpleApp : Application(), ImageLoaderFactory {
     val debugMode = DebugMode()
     lateinit var http: OkHttpClient
     lateinit var tokens: TokenStore
+        private set
     lateinit var playback: PlaybackApi
     lateinit var home: HomeApi
     lateinit var following: FollowingApi
@@ -43,9 +46,10 @@ class PurpleApp : Application(), ImageLoaderFactory {
     lateinit var auth: DeviceAuth
     lateinit var helix: HelixClient
     lateinit var playerPrefs: PlayerPrefs
-    val snapshot = HomeSnapshot()
-    /** The row the last stream was opened from, for the player's Channels strip. */
-    var zap: ZapList? = null
+    lateinit var snapshot: HomeSnapshot
+        private set
+    lateinit var playerLaunchRows: PlayerLaunchRows
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -53,6 +57,14 @@ class PurpleApp : Application(), ImageLoaderFactory {
         DebugIndicator(this, debugMode)
         http = Http.client(debugMode)
         tokens = PrefsTokenStore(getSharedPreferences("purpletv", MODE_PRIVATE))
+        snapshot = HomeSnapshot(tokens)
+        playerLaunchRows = PlayerLaunchRows(tokens)
+        MainScope().launch {
+            tokens.sessionIds.collect {
+                snapshot.clearPreviousSession()
+                playerLaunchRows.clearPreviousSession()
+            }
+        }
         auth = DeviceAuth(http, TV_CLIENT_ID, SCOPES, tokens)
         playback = PlaybackApi(http, auth)
         home = HomeApi(http, auth, deviceId = deviceId(getSharedPreferences("purpletv", MODE_PRIVATE)))

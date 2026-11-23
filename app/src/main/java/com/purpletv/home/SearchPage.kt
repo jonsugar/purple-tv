@@ -12,6 +12,7 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.purpletv.R
+import com.purpletv.auth.SessionId
 import com.purpletv.player.ZapList
 import com.purpletv.twitch.Category
 import com.purpletv.twitch.HelixClient
@@ -26,6 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /**
@@ -53,9 +55,13 @@ class SearchPage(
     private val followed = Row(view.findViewById(R.id.search_followed), R.string.row_followed, RowKind.CHANNELS)
     private var topCategories: List<Category>? = null
     private var focusResults = false
+    private var restartSearch = false
     private var pending: Job? = null
+    private var pendingTop: Job? = null
+    private var session: SessionId = helix.sessionId
 
     init {
+        empty.visibility = View.GONE
         channels.root.visibility = View.GONE
         categories.root.visibility = View.GONE
         field.doAfterTextChanged { schedule(it?.toString().orEmpty()) }
@@ -78,10 +84,30 @@ class SearchPage(
 
     /** Each time Cerca opens: the empty state follows the latest searches and Home. */
     fun show() {
-        if (!SearchLogic.shouldSearch(field.text.toString())) showEmptyState()
+        onSessionChanged()
+        val query = field.text.toString()
+        if (!SearchLogic.shouldSearch(query)) showEmptyState()
+        else if (restartSearch) schedule(query)
+    }
+
+    fun onSessionChanged() {
+        val current = helix.sessionId
+        if (session === current) return
+        session = current
+        pending?.cancel()
+        pendingTop?.cancel()
+        pendingTop = null
+        focusResults = false
+        channels.clear()
+        categories.clear()
+        followed.clear()
+        suggest.clear()
+        restartSearch = true
+        if (view.parent != null) schedule(field.text.toString())
     }
 
     private fun schedule(query: String) {
+        restartSearch = false
         pending?.cancel()
         if (!SearchLogic.shouldSearch(query)) {
             channels.root.visibility = View.GONE
@@ -90,18 +116,24 @@ class SearchPage(
             return
         }
         empty.visibility = View.GONE
+        val requestedSession = session
         pending = scope.launch {
             delay(DEBOUNCE_MS)
+            if (helix.sessionId !== requestedSession) return@launch
             // Twitch ranks exact-name offline accounts first; asking for live ones too keeps them on top.
-            val liveChannels = async { runCatching { helix.searchChannels(query.trim(), liveOnly = true) } }
-            val allChannels = async { runCatching { helix.searchChannels(query.trim()) } }
+            val liveChannels = async { runCatching { helix.searchChannels(query.trim(), liveOnly = true, session = requestedSession) } }
+            val allChannels = async { runCatching { helix.searchChannels(query.trim(), session = requestedSession) } }
             val foundChannels = liveChannels.await().fold(
                 onSuccess = { live -> allChannels.await().map { SearchLogic.liveFirst((live + it).distinctBy { c -> c.login }) } },
                 onFailure = { allChannels.await().map { SearchLogic.liveFirst(it) } },
             )
-            val foundCategories = async { runCatching { helix.searchCategories(query.trim()) } }
+            val foundCategories = async { runCatching { helix.searchCategories(query.trim(), requestedSession) } }
+            ensureActive()
+            if (helix.sessionId !== requestedSession) return@launch
             channels.show(foundChannels.map { list -> list.map { RowItem.ChannelItem(it) } })
-            categories.show(foundCategories.await().map { list -> list.map { RowItem.CategoryItem(it) } })
+            val result = foundCategories.await()
+            if (helix.sessionId !== requestedSession) return@launch
+            categories.show(result.map { list -> list.map { RowItem.CategoryItem(it) } })
             if (focusResults) {
                 focusResults = false
                 (if (foundChannels.getOrNull().isNullOrEmpty()) categories else channels).focusFirst()
@@ -121,16 +153,7 @@ class SearchPage(
         }
         recentTitle.visibility = if (queries.isEmpty()) View.GONE else View.VISIBLE
         recentScroll.visibility = recentTitle.visibility
-        refreshLiveSuggestions()
-        val suggested = snapshot.recommendedCategories.ifEmpty { topCategories.orEmpty() }
-        suggest.showOrHide(suggested.map { RowItem.CategoryItem(it) })
-        if (suggested.isEmpty()) scope.launch {
-            // Without Twitch's own rows from Home, the most watched categories.
-            runCatching { helix.topCategories().items }.onSuccess { top ->
-                topCategories = top
-                if (empty.visibility == View.VISIBLE) suggest.showOrHide(top.map { RowItem.CategoryItem(it) })
-            }
-        }
+        refreshSuggestions()
     }
 
     private fun focusEmptyState() {
@@ -152,34 +175,55 @@ class SearchPage(
     }
 
     private fun open(item: RowItem) {
+        if (session !== helix.sessionId) return
         val opened = when (item) {
             is RowItem.ChannelItem -> {
-                if (item.channel.isLive) Nav.openStream(context, item.channel.login, zap = followedZap())
+                if (item.channel.isLive) Nav.openStream(context, item.channel.login, zap = followedZap(), session = session)
                 else Toast.makeText(context, context.getString(R.string.channel_offline, item.channel.displayName), Toast.LENGTH_SHORT).show()
                 item.channel.isLive
             }
             is RowItem.CategoryItem -> { Nav.openCategory(context, item.category); true }
-            is RowItem.StreamItem -> { Nav.openStream(context, item.stream.login, item.stream, zap = followedZap()); true }
+            is RowItem.StreamItem -> { Nav.openStream(context, item.stream.login, item.stream, zap = followedZap(), session = session); true }
             RowItem.Skeleton -> false
         }
         // Only a search that led somewhere is worth keeping; the empty state's own cards add nothing.
         if (opened) recent.add(field.text.toString())
     }
 
-    fun refreshLiveSuggestions() {
-        if (empty.visibility == View.VISIBLE) {
-            followed.showOrHide(filteredFollowed().map { RowItem.ChannelItem(it.asChannel(snapshot.avatars[it.userId])) })
+    fun refreshSuggestions() {
+        if (empty.visibility != View.VISIBLE || session !== helix.sessionId) return
+        val home = snapshot.current
+        followed.showOrHide(filteredFollowed(home).map { RowItem.ChannelItem(it.asChannel(home.avatars[it.userId])) })
+        val suggested = home.recommendedCategories.ifEmpty { topCategories.orEmpty() }
+        suggest.showOrHide(suggested.map { RowItem.CategoryItem(it) })
+        if (suggested.isEmpty() && pendingTop?.isActive != true) {
+            val requestedSession = session
+            pendingTop = scope.launch {
+                // Without Twitch's own rows from Home, show the most watched categories.
+                val top = runCatching { helix.topCategories(session = requestedSession).items }.getOrNull() ?: return@launch
+                ensureActive()
+                if (helix.sessionId !== requestedSession) return@launch
+                topCategories = top
+                if (empty.visibility == View.VISIBLE) {
+                    val categories = snapshot.current.recommendedCategories.ifEmpty { top }
+                    suggest.showOrHide(categories.map { RowItem.CategoryItem(it) })
+                }
+            }
         }
     }
 
-    private fun filteredFollowed() = streamPrefs.language.value.filter(snapshot.followedLive)
+    private fun filteredFollowed(home: HomeSnapshot.Content) = streamPrefs.language.value.filter(home.followedLive)
 
-    private fun followedZap() = ZapList(context.getString(R.string.row_followed), filteredFollowed())
+    private fun followedZap() = ZapList(context.getString(R.string.row_followed), filteredFollowed(snapshot.current))
 
     private inner class Row(val root: View, title: Int, kind: RowKind) {
         private val empty: TextView = root.findViewById(R.id.row_empty)
         private val list: RecyclerView = root.findViewById(R.id.row_list)
-        private val adapter = RowAdapter(::open)
+        private val adapter = RowAdapter(::openCurrent)
+
+        private fun openCurrent(item: RowItem) {
+            if (item in adapter.currentList) open(item)
+        }
 
         init {
             root.findViewById<TextView>(R.id.row_title).setText(title)
@@ -202,6 +246,11 @@ class SearchPage(
             root.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
             empty.visibility = View.GONE
             adapter.submitList(items)
+        }
+
+        fun clear() {
+            root.visibility = View.GONE
+            adapter.submitList(null)
         }
 
         // Fresh results may not be laid out yet: try again shortly until the first card takes the focus.

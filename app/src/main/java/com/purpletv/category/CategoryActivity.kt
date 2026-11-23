@@ -10,6 +10,7 @@ import android.widget.TextView
 import coil.load
 import com.purpletv.PurpleApp
 import com.purpletv.R
+import com.purpletv.auth.SessionId
 import com.purpletv.home.MainActivity
 import com.purpletv.home.Screen
 import com.purpletv.home.homeIsStale
@@ -50,6 +51,7 @@ class CategoryActivity : Activity() {
     private val categoryId get() = intent.getStringExtra(EXTRA_ID).orEmpty()
     private var language = app.streamPrefs.language.value
     private var account: String? = null
+    private var accountSession: SessionId? = null
     private var followedStreams = emptyList<Stream>()
     private var followRevision: Long? = null
     private var followedLoadFailed = false
@@ -88,7 +90,7 @@ class CategoryActivity : Activity() {
             finish()
         }
         rail.select(intent.getStringExtra(EXTRA_ORIGIN)?.let(::screenFrom) ?: Screen.BROWSE)
-        PurpleApp.instance.snapshot.meAvatar?.let(rail::setAvatar)
+        rail.observeAvatar(scope, app.snapshot)
 
         languageControl = findViewById(R.id.category_language)
         languageControl.showStreamLanguage(language)
@@ -102,9 +104,10 @@ class CategoryActivity : Activity() {
         }
         val grid = results.grid
         adapter = GridAdapter(COLUMNS, { item ->
-            if (item is RowItem.StreamItem) {
+            val session = accountSession
+            if (item is RowItem.StreamItem && session != null && item in adapter.currentList) {
                 val zap = ZapList(name, adapter.currentList.filterIsInstance<RowItem.StreamItem>().map { it.stream })
-                Nav.openStream(this, item.stream.login, item.stream, adapter.avatars[item.stream.userId], zap)
+                Nav.openStream(this, item.stream.login, item.stream, adapter.avatars[item.stream.userId], zap, session)
             }
         }) { if (pager.hasLoaded && !pager.hasFailed) pager.loadMore() }
         adapter.attachTo(grid)
@@ -133,6 +136,11 @@ class CategoryActivity : Activity() {
         pager = Pager(scope, key = Stream::userId, fetch = { cursor ->
             helix.topStreams(gameId = categoryId, cursor = cursor, language = language)
         }, onAuthRequired = ::requireLogin, onPage = updateStreams)
+        scope.launch {
+            app.tokens.sessionIds.collect {
+                if (syncAccount() && followUpdates?.isActive == true) observeFollowChanges()
+            }
+        }
     }
 
     private fun refreshLanguage() {
@@ -148,25 +156,32 @@ class CategoryActivity : Activity() {
         pager.reset()
         avatarLoad?.cancel()
         adapter.submitList(null)
+        adapter.avatars = emptyMap()
         results.grid.scrollToPosition(0)
         results.loading()
     }
 
     override fun onStart() {
         super.onStart()
-        if (account != app.tokens.userId) {
-            account = app.tokens.userId
-            followedStreams = emptyList()
-            followRevision = null
-            followedLoadFailed = false
-            ghostStreams = emptyList()
-            ghostRevision = null
-            ghostLoadedAt = 0L
-            ghostLoadFailed = false
-            resetStreams()
-        }
+        syncAccount()
         refreshLanguage()
         observeFollowChanges()
+    }
+
+    private fun syncAccount(): Boolean {
+        val session = app.tokens.session
+        if (accountSession === session.id && account == session.userId) return false
+        accountSession = session.id
+        account = session.userId
+        followedStreams = emptyList()
+        followRevision = null
+        followedLoadFailed = false
+        ghostStreams = emptyList()
+        ghostRevision = null
+        ghostLoadedAt = 0L
+        ghostLoadFailed = false
+        resetStreams()
+        return true
     }
 
     private fun observeFollowChanges() {
@@ -179,7 +194,7 @@ class CategoryActivity : Activity() {
                     try {
                         val streams = if (owner == null) emptyList() else app.helix.followedStreams(owner, session)
                         ensureActive()
-                        if (app.tokens.userId != owner) return@collectLatest
+                        if (app.tokens.session.id !== session) return@collectLatest
                         followedStreams = streams
                         followRevision = revision
                         followedLoadFailed = false
@@ -196,7 +211,7 @@ class CategoryActivity : Activity() {
                     try {
                         val streams = app.helix.streamsByUserIds(app.ghostFollows.ids(owner), session)
                         ensureActive()
-                        if (app.tokens.userId != owner) return@collectLatest
+                        if (app.tokens.session.id !== session) return@collectLatest
                         ghostStreams = streams
                         ghostRevision = localRevision
                         ghostLoadedAt = SystemClock.elapsedRealtime()

@@ -66,6 +66,7 @@ class HomePage(
     private var onFirstCard = true
     private var sourceRows = emptyList<HomeRow>()
     private var rowsAccount: String? = null
+    private var rowsSession: SessionId? = null
     private var ghostLive = emptyList<Stream>()
     private var ghostAvatars = emptyMap<String, String>()
 
@@ -102,6 +103,7 @@ class HomePage(
         )
         sourceRows = listOf(followed) + lower
         rowsAccount = userId
+        rowsSession = session
         applyStreamPreferences(userId)
         adapter.warmUp(rows)
         focusedRow = -1
@@ -122,34 +124,35 @@ class HomePage(
         }
         hero.refresh()
 
-        snapshot.followedLive = followedResult.getOrDefault(emptyList())
-        snapshot.avatars = lower.fold(urls) { all, row -> all + row.avatars }
-        snapshot.recommendedCategories = below.firstOrNull { it.categories.isNotEmpty() }?.categories
+        val categories = below.firstOrNull { it.categories.isNotEmpty() }?.categories
             ?: lower.firstNotNullOfOrNull { row ->
                 row.items.getOrNull()?.filterIsInstance<RowItem.CategoryItem>()?.map { it.category }?.ifEmpty { null }
             }
             ?: emptyList()
+        snapshot.publishRows(session, followedResult.getOrDefault(emptyList()),
+            lower.fold(urls) { all, row -> all + row.avatars }, categories)
     }
 
     fun showError() {
         sourceRows = emptyList()
-        rowsAccount = null
+        hero.clearMissingCard(emptyList())
         adapter.submit(listOf(HomeRow(context.getString(R.string.row_followed), RowKind.STREAMS, Result.failure(RuntimeException()))))
     }
 
     /** The local edit is already saved. This only refreshes live metadata on return to Home. */
     suspend fun refreshGhostLive(account: String) {
-        if (rowsAccount != account) return
+        val session = helix.sessionId
+        if (rowsAccount != account || rowsSession !== session) return
         applyStreamPreferences(account)
         try {
-            val streams = helix.streamsByUserIds(ghostFollows.ids(account))
+            val streams = helix.streamsByUserIds(ghostFollows.ids(account), session)
             currentCoroutineContext().ensureActive()
-            if (rowsAccount != account) return
+            if (helix.sessionId !== session) return
             ghostLive = streams
             applyStreamPreferences(account)
-            val urls = avatars.urls(streams.map(Stream::userId))
+            val urls = avatars.urls(streams.map(Stream::userId), session)
             currentCoroutineContext().ensureActive()
-            if (rowsAccount != account) return
+            if (helix.sessionId !== session) return
             ghostAvatars = urls
             applyStreamPreferences(account)
         } catch (e: IOException) {
@@ -158,7 +161,7 @@ class HomePage(
     }
 
     fun applyStreamPreferences(account: String?) {
-        if (rowsAccount != account || sourceRows.isEmpty()) return
+        if (rowsAccount != account || rowsSession !== helix.sessionId || sourceRows.isEmpty()) return
         val language = streamPrefs.language.value
         val matching = filterLiveRows(sourceRows, language)
         val pinnedRows = withChannelPins(matching, pins.list(account, FollowKind.CHANNEL))
@@ -172,13 +175,14 @@ class HomePage(
         }
     }
 
-    fun clearPreviousAccount(account: String?) {
-        if (rowsAccount == null || rowsAccount == account) return
+    fun clearPreviousSession(session: SessionId) {
+        if (rowsSession === session) return
+        rowsSession = null
         rowsAccount = null
         sourceRows = emptyList()
         ghostLive = emptyList()
         ghostAvatars = emptyMap()
-        hero.cancel()
+        hero.clearMissingCard(emptyList())
         adapter.submit(skeletonRows())
     }
 
@@ -199,6 +203,7 @@ class HomePage(
     }
 
     private fun onCardFocused(row: Int, item: RowItem) {
+        if (rowsSession !== helix.sessionId) return
         onFirstCard = adapter.rows.getOrNull(row)?.items?.getOrNull()?.firstOrNull() == item
         if (row >= 0 && row != focusedRow) {
             focusedRow = row
@@ -212,22 +217,24 @@ class HomePage(
         hero.schedule(item)
     }
 
-    private fun open(item: RowItem) {
+    private fun open(position: Int, item: RowItem) {
+        val session = rowsSession ?: return
+        if (session !== helix.sessionId) return
+        val row = adapter.rows.getOrNull(position) ?: return
+        val items = row.items.getOrNull().orEmpty()
+        if (item !in items) return
         when (item) {
-            is RowItem.StreamItem -> Nav.openStream(context, item.stream.login, item.stream, avatarOf(item.stream.userId), zapListFor(item))
+            is RowItem.StreamItem -> {
+                val zap = ZapList(row.title, items.filterIsInstance<RowItem.StreamItem>().map { it.stream })
+                Nav.openStream(context, item.stream.login, item.stream, avatarOf(item.stream.userId), zap, session)
+            }
             is RowItem.CategoryItem -> Nav.openCategory(context, item.category)
-            is RowItem.ChannelItem -> Nav.openStream(context, item.channel.login)
+            is RowItem.ChannelItem -> Nav.openStream(context, item.channel.login, session = session)
             RowItem.Skeleton -> Unit
         }
     }
 
     private fun avatarOf(userId: String): String? = adapter.rows.firstNotNullOfOrNull { it.avatars[userId] }
-
-    /** The streams of the card's own row, for the player's Channels strip. */
-    private fun zapListFor(item: RowItem): ZapList? {
-        val row = adapter.rows.firstOrNull { it.items.getOrNull()?.contains(item) == true } ?: return null
-        return ZapList(row.title, row.items.getOrNull().orEmpty().filterIsInstance<RowItem.StreamItem>().map { it.stream })
-    }
 
     private fun skeletonRows(): List<HomeRow> = listOf(
         HomeRow(context.getString(R.string.row_followed), RowKind.STREAMS, Result.success(List(SKELETON_CARDS) { RowItem.Skeleton })),
@@ -310,6 +317,7 @@ class HomePage(
                 b.visibility = View.INVISIBLE
                 a.clear()
                 b.clear()
+                avatar.clear()
                 backdrop = null
             }
         }

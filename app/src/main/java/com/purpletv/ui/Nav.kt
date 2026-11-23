@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import com.purpletv.category.CategoryActivity
 import com.purpletv.PurpleApp
+import com.purpletv.auth.SessionId
 import com.purpletv.player.PlayerActivity
 import com.purpletv.player.ZapList
 import com.purpletv.player.toTuneInfo
@@ -21,9 +22,20 @@ object Nav {
      * With the card's [stream] (and [avatar]), the player shows them while the video loads; [zap] is
      * the row it came from, for the Channels strip (none: the followed channels live).
      */
-    fun openStream(context: Context, login: String, stream: Stream? = null, avatar: String? = null, zap: ZapList? = null) {
-        PurpleApp.instance.zap = zap
+    fun openStream(
+        context: Context,
+        login: String,
+        stream: Stream? = null,
+        avatar: String? = null,
+        zap: ZapList? = null,
+        session: SessionId = PurpleApp.instance.tokens.session.id,
+    ) {
+        val app = PurpleApp.instance
+        if (app.tokens.session.id !== session) return
         val intent = Intent(context, PlayerActivity::class.java).putExtra(PlayerActivity.EXTRA_CHANNEL, login)
+        zap?.let {
+            intent.putExtra(PlayerActivity.EXTRA_LAUNCH_ROW, app.playerLaunchRows.put(session, it))
+        }
         stream?.toTuneInfo(avatar)?.let { tune ->
             intent.putExtra(PlayerActivity.EXTRA_NAME, tune.name)
                 .putExtra(PlayerActivity.EXTRA_TITLE, tune.title)

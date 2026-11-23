@@ -9,7 +9,6 @@ import android.widget.TextView
 import com.purpletv.PurpleApp
 import com.purpletv.R
 import com.purpletv.auth.DeviceAuth
-import com.purpletv.auth.InMemoryTokenStore
 import com.purpletv.auth.signIn
 import com.purpletv.twitch.FollowApi
 import com.purpletv.twitch.HelixClient
@@ -25,7 +24,6 @@ import okhttp3.mockwebserver.SocketPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,6 +61,7 @@ class PlayerShortcutTest {
                 putExtra(PlayerActivity.EXTRA_THUMB, "caller thumbnail")
                 putExtra(PlayerActivity.EXTRA_AVATAR, "caller avatar")
                 putExtra(PlayerActivity.EXTRA_SHORTCUT, false)
+                putExtra(PlayerActivity.EXTRA_LAUNCH_ROW, "caller row key")
                 data = Uri.parse("https://example.invalid/")
             }
 
@@ -76,14 +75,12 @@ class PlayerShortcutTest {
     }
 
     @Test fun shortcutLoadsAppMetadataAndUsesTheDefaultChannelsRow() {
-        val previousRow = ZapList("Previous card row", listOf(card))
-        app.zap = previousRow
         val outgoing = checkNotNull(forwardedIntent(shortcut(card.login)))
         MockWebServer().use { server ->
             configurePlayback(server)
+            cardIntent("Previous card row")
             val player = Robolectric.buildActivity(PlayerActivity::class.java, outgoing).create()
             assertEquals(View.GONE, player.get().findViewById<View>(R.id.overlay_zap).visibility)
-            assertSame(previousRow, app.zap)
             assertEquals(card.login, player.get().tuneText(R.id.tune_name))
 
             player.start()
@@ -98,14 +95,8 @@ class PlayerShortcutTest {
     }
 
     @Test fun inAppStreamCardStillSuppliesTuneInImagesAndTheChannelsRow() {
-        val caller = Robolectric.buildActivity(Activity::class.java).create()
-        val row = ZapList("Card row", listOf(card))
         val avatar = "https://example.invalid/avatar.png"
-        Nav.openStream(caller.get(), card.login, card, avatar, row)
-        val outgoing = shadowOf(caller.get()).nextStartedActivity
-        caller.destroy()
-
-        assertSame(row, app.zap)
+        val outgoing = cardIntent("Card row", avatar)
         assertEquals(PlayerActivity::class.java.name, outgoing.component?.className)
         assertEquals(card.toTuneInfo(avatar).thumbnail, outgoing.getStringExtra(PlayerActivity.EXTRA_THUMB))
         assertEquals(avatar, outgoing.getStringExtra(PlayerActivity.EXTRA_AVATAR))
@@ -114,10 +105,51 @@ class PlayerShortcutTest {
             assertEquals(card.title, player.get().tuneText(R.id.tune_title))
             assertEquals(card.displayName, player.get().tuneText(R.id.tune_name))
             assertEquals(View.VISIBLE, player.get().findViewById<View>(R.id.overlay_zap).visibility)
+            assertEquals("Card row", player.get().tuneText(R.id.zap_title))
         } finally {
             player.destroy()
         }
     }
+
+    @Test fun independentAndOutOfOrderLaunchesReceiveOnlyTheirOwnRow() {
+        val first = cardIntent("First")
+        val second = cardIntent("Second")
+        val independent = Intent(app, PlayerActivity::class.java).putExtra(PlayerActivity.EXTRA_CHANNEL, card.login)
+        Robolectric.buildActivity(PlayerActivity::class.java, independent).create().use {
+            assertEquals(View.GONE, it.get().findViewById<View>(R.id.overlay_zap).visibility)
+        }
+        for ((intent, title) in listOf(second to "Second", first to "First")) {
+            Robolectric.buildActivity(PlayerActivity::class.java, intent).create().use {
+                assertEquals(title, it.get().tuneText(R.id.zap_title))
+            }
+        }
+        Robolectric.buildActivity(PlayerActivity::class.java, first).create().use {
+            assertEquals(View.GONE, it.get().findViewById<View>(R.id.overlay_zap).visibility)
+        }
+    }
+
+    @Test fun replacementLoginDiscardsBothPendingAndDisplayedCardRows() {
+        app.tokens.signIn("old", userId = "42")
+        val pending = cardIntent("Pending")
+        val active = cardIntent("Active")
+        Robolectric.buildActivity(PlayerActivity::class.java, active).create().use {
+            assertEquals("Active", it.get().tuneText(R.id.zap_title))
+            app.tokens.signIn("new", userId = "42")
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(View.GONE, it.get().findViewById<View>(R.id.overlay_zap).visibility)
+        }
+        app.snapshot.publishRows(app.tokens.session.id, listOf(card), emptyMap(), emptyList())
+        Robolectric.buildActivity(PlayerActivity::class.java, pending).create().use {
+            assertEquals(View.VISIBLE, it.get().findViewById<View>(R.id.overlay_zap).visibility)
+            assertEquals(it.get().getString(R.string.row_followed), it.get().tuneText(R.id.zap_title))
+        }
+    }
+
+    private fun cardIntent(title: String, avatar: String? = null): Intent =
+        Robolectric.buildActivity(Activity::class.java).create().use { caller ->
+            Nav.openStream(caller.get(), card.login, card, avatar, ZapList(title, listOf(card)))
+            checkNotNull(shadowOf(caller.get()).nextStartedActivity)
+        }
 
     private fun shortcut(channel: String? = null) = Intent(app, PlayerShortcutActivity::class.java).apply {
         if (channel != null) putExtra(PlayerActivity.EXTRA_CHANNEL, channel)
@@ -134,9 +166,8 @@ class PlayerShortcutTest {
     }
 
     private fun configurePlayback(server: MockWebServer) {
-        val tokens = InMemoryTokenStore().apply { signIn("test-token", "test-refresh", "42") }
+        val tokens = app.tokens.apply { signIn("test-token", "test-refresh", "42") }
         val auth = DeviceAuth(app.http, "tv", "", tokens)
-        app.tokens = tokens
         app.helix = HelixClient(app.http, tokens, auth, server.url("/helix/").toString())
         app.follows = FollowApi(TwitchGraphQl(app.http, auth, server.url("/follow").toString()), app.followChanges)
         app.playback = PlaybackApi(app.http, auth, server.url("/playback").toString())

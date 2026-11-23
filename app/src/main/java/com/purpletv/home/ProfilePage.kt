@@ -7,12 +7,11 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.Switch
 import android.widget.TextView
-import coil.load
-import coil.transform.CircleCropTransformation
 import com.purpletv.R
 import com.purpletv.net.DebugMode
 import com.purpletv.player.PlayerPrefs
 import com.purpletv.twitch.User
+import com.purpletv.ui.loadAccountAvatar
 
 /** Profilo: who is signed in, the default quality, the chat preference, and sign-out. */
 class ProfilePage(
@@ -77,9 +76,7 @@ class ProfilePage(
 
     fun bind(user: User?) {
         name.text = user?.displayName.orEmpty()
-        user?.profileImageUrl?.takeIf { it.isNotEmpty() }?.let {
-            avatar.load(it) { transformations(CircleCropTransformation()) }
-        }
+        avatar.loadAccountAvatar(user?.profileImageUrl)
         quality.text = qualityLabel()
         chat.text = chatLabel()
     }

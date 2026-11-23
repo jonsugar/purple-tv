@@ -5,6 +5,7 @@ import android.graphics.drawable.Drawable
 import android.widget.ImageView
 import coil.dispose
 import coil.imageLoader
+import coil.load
 import coil.request.Disposable
 import coil.request.ImageRequest
 import coil.size.ViewSizeResolver
@@ -18,6 +19,11 @@ fun ImageView.clear() {
     setTag(R.id.card_load, null)
     dispose()
     setImageDrawable(null)
+}
+
+fun ImageView.loadAccountAvatar(url: String?) {
+    if (url.isNullOrEmpty()) clear()
+    else load(url) { transformations(CircleCropTransformation()) }
 }
 
 /**

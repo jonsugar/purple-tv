@@ -39,6 +39,7 @@ import coil.load
 import coil.transform.CircleCropTransformation
 import com.purpletv.PurpleApp
 import com.purpletv.R
+import com.purpletv.auth.SessionId
 import com.purpletv.chat.ChatClient
 import com.purpletv.net.Http
 import com.purpletv.chat.ChatView
@@ -82,6 +83,8 @@ class PlayerActivity : Activity() {
 
     private var login = ""
     private var resolveShortcutTune = false
+    private var cardRow: PlayerLaunchRows.Launch? = null
+    private var rowsSession: SessionId? = null
     private lateinit var zap: ZapList
     private lateinit var playerView: PlayerView
     private lateinit var stage: View
@@ -96,13 +99,18 @@ class PlayerActivity : Activity() {
     private lateinit var ghostButton: GhostFollowButton
     private var confirmingUnfollow = false
     private lateinit var zapStrip: View
-    private val zapAdapter = ZapAdapter { zapTo(it) }
+    private val zapAdapter = ZapAdapter {
+        if (rowsSession === app.tokens.session.id && it in zap.streams) zapTo(it)
+    }
     private lateinit var qualityMenu: View
     private lateinit var qualityList: LinearLayout
     private lateinit var message: View
     private lateinit var tune: View
     private lateinit var offlinePage: View
-    private val offlineAdapter = RowAdapter({ item -> if (item is RowItem.StreamItem) zapTo(item.stream) })
+    private var offlineStreams = emptyList<Stream>()
+    private val offlineAdapter = RowAdapter({ item ->
+        if (item is RowItem.StreamItem && rowsSession === app.tokens.session.id && item.stream in offlineStreams) zapTo(item.stream)
+    })
     private var channelName = ""
     private lateinit var chatView: ChatView
     private var chat: ChatClient? = null
@@ -123,6 +131,10 @@ class PlayerActivity : Activity() {
         setContentView(R.layout.activity_player)
         login = intent.getStringExtra(EXTRA_CHANNEL).orEmpty().trim().lowercase()
         resolveShortcutTune = intent.getBooleanExtra(EXTRA_SHORTCUT, false)
+        cardRow = if (resolveShortcutTune) null else {
+            (lastNonConfigurationInstance as? PlayerLaunchRows.Launch)
+                ?: app.playerLaunchRows.take(intent.getStringExtra(EXTRA_LAUNCH_ROW))
+        }
         playerView = findViewById(R.id.player_view)
         stage = findViewById(R.id.player_stage)
         overlay = findViewById(R.id.info_overlay)
@@ -158,15 +170,8 @@ class PlayerActivity : Activity() {
         ghostView.nextFocusUpId = R.id.overlay_back
         ghostView.nextFocusLeftId = R.id.overlay_follow
         ghostView.nextFocusRightId = R.id.overlay_ghost_follow
-        val cardRow = if (resolveShortcutTune) null else app.zap
-        val source = cardRow ?: ZapList(getString(R.string.row_followed), app.snapshot.followedLive)
-        zap = source.copy(streams = app.streamPrefs.language.value.filter(source.streams))
-        zapButton.visibility = if (zap.isEmpty()) View.GONE else View.VISIBLE
-        chatButton.nextFocusRightId = if (zap.isEmpty()) R.id.overlay_follow else R.id.overlay_zap
         zapButton.nextFocusRightId = R.id.overlay_follow
-        followView.nextFocusLeftId = if (zap.isEmpty()) R.id.overlay_chat else R.id.overlay_zap
         nameButtons()
-        findViewById<TextView>(R.id.zap_title).text = zap.title
         findViewById<RecyclerView>(R.id.zap_list).apply {
             layoutManager = LinearLayoutManager(this@PlayerActivity, LinearLayoutManager.HORIZONTAL, false)
             adapter = zapAdapter
@@ -189,10 +194,15 @@ class PlayerActivity : Activity() {
                 fixRowHeight(RowKind.STREAMS)
             }
         }
+        refreshChannelRows()
+        scope.launch { app.snapshot.updates.collect { refreshChannelRows() } }
     }
+
+    override fun onRetainNonConfigurationInstance(): Any? = cardRow
 
     override fun onStart() {
         super.onStart()
+        refreshChannelRows()
         start()
         loadStreamInfo()
         if (prefs.chatVisible) showChat()
@@ -379,12 +389,8 @@ class PlayerActivity : Activity() {
         message.visibility = View.GONE
         offlinePage.visibility = View.VISIBLE
         findViewById<TextView>(R.id.offline_title).text = getString(R.string.offline_title, channelName)
-        val suggestions = offlineSuggestions(app.streamPrefs.language.value.filter(app.snapshot.followedLive), login)
-        val row = findViewById<View>(R.id.offline_row)
-        row.visibility = if (suggestions.isEmpty()) View.GONE else View.VISIBLE
-        offlineAdapter.avatars = app.snapshot.avatars
-        offlineAdapter.submitList(suggestions.map { RowItem.StreamItem(it) })
-        if (suggestions.isNotEmpty()) focusFirstSuggestion(row.findViewById(R.id.row_list))
+        refreshChannelRows()
+        if (offlineStreams.isNotEmpty()) focusFirstSuggestion(findViewById<View>(R.id.offline_row).findViewById(R.id.row_list))
         val shownFor = login
         scope.launch {
             val user = runCatching { app.helix.userByLogin(shownFor) }.getOrNull() ?: return@launch
@@ -656,8 +662,44 @@ class PlayerActivity : Activity() {
 
     // --- Zapping
 
+    private fun refreshChannelRows() {
+        val session = app.tokens.session.id
+        val changedSession = rowsSession !== session
+        rowsSession = session
+        cardRow = cardRow?.takeIf { it.session === session }
+        val home = app.snapshot.current
+        val language = app.streamPrefs.language.value
+        val source = cardRow?.row ?: ZapList(getString(R.string.row_followed), home.followedLive)
+        val next = source.copy(streams = language.filter(source.streams))
+        if (!::zap.isInitialized || changedSession || next != zap) {
+            val zapHadFocus = zapButton.hasFocus() || zapStrip.hasFocus()
+            hideZapStrip()
+            zapAdapter.submit(emptyList(), login)
+            zap = next
+            zapButton.visibility = if (zap.isEmpty()) View.GONE else View.VISIBLE
+            chatButton.nextFocusRightId = if (zap.isEmpty()) R.id.overlay_follow else R.id.overlay_zap
+            followView.nextFocusLeftId = if (zap.isEmpty()) R.id.overlay_chat else R.id.overlay_zap
+            findViewById<TextView>(R.id.zap_title).text = zap.title
+            if (zapHadFocus && zap.isEmpty()) chatButton.requestFocus()
+        }
+        if (changedSession) {
+            offlineStreams = emptyList()
+            offlineAdapter.avatars = emptyMap()
+            offlineAdapter.submitList(null)
+        }
+        if (layer == PlayerLayer.OFFLINE) {
+            val suggestions = offlineSuggestions(language.filter(home.followedLive), login)
+            findViewById<View>(R.id.offline_row).visibility = if (suggestions.isEmpty()) View.GONE else View.VISIBLE
+            offlineAdapter.avatars = home.avatars
+            offlineStreams = suggestions
+            offlineAdapter.submitList(suggestions.map { RowItem.StreamItem(it) })
+        }
+    }
+
     /** Opens on the channel playing; the overlay stays up while the strip is open. */
     private fun showZapStrip() {
+        refreshChannelRows()
+        if (zap.isEmpty()) return
         zapAdapter.submit(zap.streams, login)
         zapStrip.visibility = View.VISIBLE
         ui.removeCallbacks(autoHide)
@@ -703,7 +745,7 @@ class PlayerActivity : Activity() {
         followButton.bind(FollowKind.CHANNEL, target.userId, target.displayName.ifBlank { target.login })
         ghostButton.bind(target.userId, target.login, target.displayName)
         stream = target
-        bindTune(target.toTuneInfo(app.snapshot.avatars[target.userId]))
+        bindTune(target.toTuneInfo(app.snapshot.current.avatars[target.userId]))
         message.visibility = View.GONE
         // A fresh player, as when the screen opens: the same one stopped and prepared again
         // presented the new channel at ~52 fps on this TV (frames held for 2-3 vsyncs).
@@ -754,6 +796,7 @@ class PlayerActivity : Activity() {
     companion object {
         const val EXTRA_CHANNEL = "channel"
         internal const val EXTRA_SHORTCUT = "player_shortcut"
+        internal const val EXTRA_LAUNCH_ROW = "player_launch_row"
         const val EXTRA_NAME = "tune_name"
         const val EXTRA_TITLE = "tune_title"
         const val EXTRA_GAME = "tune_game"

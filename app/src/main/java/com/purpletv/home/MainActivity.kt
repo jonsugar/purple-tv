@@ -10,6 +10,7 @@ import android.widget.FrameLayout
 import com.purpletv.PurpleApp
 import com.purpletv.R
 import com.purpletv.auth.LoginActivity
+import com.purpletv.auth.SessionId
 import com.purpletv.twitch.NotLoggedInException
 import com.purpletv.twitch.User
 import com.purpletv.ui.AvatarCache
@@ -33,7 +34,9 @@ class MainActivity : Activity() {
     private lateinit var search: SearchPage
     private lateinit var profile: ProfilePage
     private var screen = Screen.HOME
-    private var me: User? = null
+    private var displayedSession: SessionId? = null
+    private var displayedProfile: User? = null
+    private var started = false
     private var loadedAtMs = 0L
     private var awaitingLogin = false
     private var followRevision = app.followChanges.revision
@@ -61,10 +64,17 @@ class MainActivity : Activity() {
             RecentSearches(getSharedPreferences(SEARCH_PREFS, MODE_PRIVATE)), app.streamPrefs)
         profile = ProfilePage(this, app.playerPrefs, app.debugMode, ::logout)
         rail = NavRail(findViewById(R.id.nav_rail), ::showScreen)
-        following.bindAccount(app.tokens.userId)
         // From the rail's Cerca, Right goes to the field above the suggestions, not into them.
         findViewById<View>(R.id.nav_search).nextFocusRightId = R.id.search_field
         openScreen(screenFrom(intent.getStringExtra(EXTRA_SCREEN)))
+        scope.launch {
+            app.snapshot.updates.collect {
+                val changed = syncSession()
+                bindProfile(app.snapshot.current.profile)
+                search.refreshSuggestions()
+                if (changed && started) loadOrLogin()
+            }
+        }
         var previousLanguage = app.streamPrefs.language.value
         scope.launch {
             app.streamPrefs.language.collect { language ->
@@ -72,7 +82,7 @@ class MainActivity : Activity() {
                 previousLanguage = language
                 home.applyStreamPreferences(app.tokens.userId)
                 following.refreshLanguage()
-                search.refreshLiveSuggestions()
+                search.refreshSuggestions()
             }
         }
     }
@@ -90,13 +100,14 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        started = true
+        syncSession()
         val followChanged = followRevision != app.followChanges.revision
         if (followChanged) {
             followRevision = app.followChanges.revision
             loadedAtMs = 0
         }
         following.bindAccount(app.tokens.userId)
-        home.clearPreviousAccount(app.tokens.userId)
         val pinsChanged = pinRevision != app.pins.revisions.value
         val ghostsChanged = ghostRevision != app.ghostFollows.revision
         ghostRevision = app.ghostFollows.revision
@@ -107,12 +118,9 @@ class MainActivity : Activity() {
         }
         if (screen == Screen.FOLLOWING) following.show()
         if (screen == Screen.BROWSE) browse.show()
-        when {
-            awaitingLogin -> Unit
-            app.tokens.accessToken == null -> { loadedAtMs = 0; login() }
-            homeIsStale(loadedAtMs, SystemClock.elapsedRealtime()) -> load()
-            ghostsChanged -> app.tokens.userId?.let(::refreshHomeGhostFollows)
-        }
+        if (awaitingLogin || app.tokens.accessToken == null ||
+            homeIsStale(loadedAtMs, SystemClock.elapsedRealtime())) loadOrLogin()
+        else if (ghostsChanged) app.tokens.userId?.let(::refreshHomeGhostFollows)
         followUpdates = scope.launch {
             app.followChanges.revisions.collect { revision ->
                 if (revision == followRevision) return@collect
@@ -133,6 +141,7 @@ class MainActivity : Activity() {
     }
 
     override fun onStop() {
+        started = false
         followUpdates?.cancel()
         pinUpdates?.cancel()
         following.cancelPinMove(restoreFocus = false)
@@ -150,9 +159,8 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != REQ_LOGIN) return
         awaitingLogin = false
-        following.bindAccount(null)
         // A new login, maybe another account: the rows and the profile load again.
-        if (resultCode == RESULT_OK) load() else finish()
+        if (resultCode == RESULT_OK) loadOrLogin() else finish()
     }
 
     @Deprecated("Back handling of the platform Activity")
@@ -178,6 +186,7 @@ class MainActivity : Activity() {
     }
 
     fun showScreen(screen: Screen) {
+        val changed = syncSession()
         if (this.screen == Screen.FOLLOWING) following.cancelPinMove(restoreFocus = false)
         this.screen = screen
         rail.select(screen)
@@ -187,8 +196,36 @@ class MainActivity : Activity() {
             Screen.BROWSE -> browse.view.also { browse.show() }
             Screen.FOLLOWING -> following.view.also { following.show() }
             Screen.SEARCH -> search.view.also { search.show() }
-            Screen.PROFILE -> profile.view.also { profile.bind(me) }
+            Screen.PROFILE -> profile.view.also { profile.bind(app.snapshot.current.profile) }
         })
+        if (changed && started) loadOrLogin()
+    }
+
+    private fun syncSession(): Boolean {
+        val session = app.tokens.session
+        if (displayedSession === session.id) return false
+        displayedSession = session.id
+        homeLoad?.cancel()
+        homeGhostLoad?.cancel()
+        loadedAtMs = 0
+        home.clearPreviousSession(session.id)
+        following.bindAccount(session.userId, session.id)
+        search.onSessionChanged()
+        bindProfile(app.snapshot.current.profile)
+        return true
+    }
+
+    private fun bindProfile(user: User?) {
+        if (displayedProfile == user) return
+        displayedProfile = user
+        profile.bind(user)
+        rail.setAvatar(user?.profileImageUrl)
+    }
+
+    private fun loadOrLogin() {
+        syncSession()
+        if (awaitingLogin) return
+        if (app.tokens.accessToken == null) login() else load()
     }
 
     private fun login() {
@@ -200,9 +237,7 @@ class MainActivity : Activity() {
 
     private fun requireLogin(error: NotLoggedInException) {
         if (!error.clearLogin(app.tokens)) return
-        loadedAtMs = 0
-        following.bindAccount(null)
-        login()
+        loadOrLogin()
     }
 
     private fun load() {
@@ -214,18 +249,15 @@ class MainActivity : Activity() {
                 val user = app.helix.me(session)
                 ensureActive()
                 if (!app.tokens.updateUserId(session, user.id)) return@launch
-                me = user
-                following.bindAccount(user.id)
-                home.clearPreviousAccount(user.id)
-                app.snapshot.meAvatar = user.profileImageUrl
-                rail.setAvatar(user.profileImageUrl)
+                if (!app.snapshot.publishProfile(session, user)) return@launch
+                following.bindAccount(user.id, session)
                 home.load(user.id, session)
                 if (app.auth.sessionId !== session) return@launch
                 refreshHomeGhostFollows(user.id)
-                search.refreshLiveSuggestions()
             } catch (e: NotLoggedInException) {
                 requireLogin(e)
             } catch (e: IOException) {
+                if (app.auth.sessionId !== session) return@launch
                 loadedAtMs = 0
                 home.showError()
             }
@@ -238,15 +270,10 @@ class MainActivity : Activity() {
     }
 
     private fun logout() {
-        homeLoad?.cancel()
-        homeGhostLoad?.cancel()
         app.tokens.clearLogin()
-        following.bindAccount(null)
-        home.clearPreviousAccount(null)
-        me = null
-        loadedAtMs = 0
+        syncSession()
         showScreen(Screen.HOME)
-        login()
+        loadOrLogin()
     }
 
     companion object {

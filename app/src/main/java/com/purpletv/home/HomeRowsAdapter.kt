@@ -35,7 +35,7 @@ data class HomeRow(
 class HomeRowsAdapter(
     private val context: Context,
     private val onFocus: (row: Int, item: RowItem) -> Unit,
-    private val onClick: (RowItem) -> Unit,
+    private val onClick: (row: Int, item: RowItem) -> Unit,
 ) : RecyclerView.Adapter<HomeRowsAdapter.Holder>() {
     private val pool = RecyclerView.RecycledViewPool().apply {
         setMaxRecycledViews(STREAM_CARD, POOL_CARDS)
@@ -89,7 +89,9 @@ class HomeRowsAdapter(
         val title: TextView = root.findViewById(R.id.row_title)
         val empty: TextView = root.findViewById(R.id.row_empty)
         val list: CardRow = root.findViewById(R.id.row_list)
-        val adapter = RowAdapter(onClick) { item -> onFocus(bindingAdapterPosition, item) }
+        val adapter = RowAdapter({ item -> onClick(bindingAdapterPosition, item) }) { item ->
+            onFocus(bindingAdapterPosition, item)
+        }
 
         init {
             // The cards stay in their row while it is off screen. A row that gave them back on

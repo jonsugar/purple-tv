@@ -33,7 +33,7 @@ import java.io.IOException
 class ChannelActivity : Activity() {
     private val scope = MainScope()
     private val app get() = PurpleApp.instance
-    private var account: String? = null
+    private val session = app.tokens.session.id
     private var broadcasterId = ""
     private var broadcasterName = ""
     private var broadcasterLogin = ""
@@ -49,7 +49,6 @@ class ChannelActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        account = app.tokens.userId
         setContentView(R.layout.activity_channel)
         val followView = findViewById<View>(R.id.channel_follow)
         followButton = FollowButton(followView, scope, app.follows, app.tokens, ::requireLogin,
@@ -60,7 +59,7 @@ class ChannelActivity : Activity() {
         ghostView.nextFocusLeftId = followView.id
         val rail = NavRail(findViewById(R.id.nav_rail), ::openMain)
         rail.select(Screen.FOLLOWING)
-        app.snapshot.meAvatar?.let(rail::setAvatar)
+        rail.observeAvatar(scope, app.snapshot)
         videos = RecordingRow(findViewById(R.id.channel_videos_row), scope, R.string.channel_videos_empty,
             { app.helix.videos(broadcasterId, it) }, ::requireLogin)
         clips = RecordingRow(findViewById(R.id.channel_clips_row), scope, R.string.channel_clips_empty,
@@ -80,14 +79,14 @@ class ChannelActivity : Activity() {
         }
         findViewById<View>(R.id.channel_retry).setOnClickListener { load() }
         findViewById<View>(R.id.channel_watch_live).setOnClickListener {
-            live?.let { Nav.openStream(this, it.login, it, avatar) }
+            live?.let { Nav.openStream(this, it.login, it, avatar, session = session) }
         }
         findViewById<TextView>(R.id.channel_name).text = intent.getStringExtra(EXTRA_LOGIN).orEmpty()
     }
 
     override fun onStart() {
         super.onStart()
-        if (app.tokens.userId != account) { openMain(Screen.FOLLOWING); return }
+        if (app.tokens.session.id !== session) { openMain(Screen.FOLLOWING); return }
         if (app.tokens.accessToken == null) { openMain(Screen.FOLLOWING); return }
         if (!loaded) load() else {
             followButton.bind(FollowKind.CHANNEL, broadcasterId, broadcasterName)

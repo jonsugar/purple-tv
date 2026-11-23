@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import com.purpletv.R
 import com.purpletv.PurpleApp
+import com.purpletv.auth.SessionId
 import com.purpletv.player.ZapList
 import com.purpletv.twitch.FollowKind
 import com.purpletv.twitch.FollowedChannel
@@ -54,6 +55,7 @@ class FollowingPage(
     private val reorder: View = view.findViewById(R.id.following_reorder)
     private var selected = 0
     private var account: String? = null
+    private var accountSession = helix.sessionId
     private var channelJob: Job? = null
     private var profileJob: Job? = null
     private var liveStatusJob: Job? = null
@@ -156,10 +158,11 @@ class FollowingPage(
         select(0)
     }
 
-    fun bindAccount(id: String?) {
-        if (account == id) return
+    fun bindAccount(id: String?, session: SessionId = helix.sessionId) {
+        if (account == id && accountSession === session) return
         cancelPinMove(restoreFocus = false)
         account = id
+        accountSession = session
         live.reset()
         categories.reset()
         channelJob?.cancel()
@@ -256,15 +259,17 @@ class FollowingPage(
     private fun openStream(item: RowItem) {
         if (item !is RowItem.StreamItem) return
         val stream = item.stream
+        if (stream !in orderedLive) return
         Nav.openStream(context, stream.login, stream, liveAdapter.avatars[stream.userId],
-            ZapList(context.getString(R.string.row_followed), orderedLive))
+            ZapList(context.getString(R.string.row_followed), orderedLive), accountSession)
     }
 
     private fun openGhostStream(item: RowItem) {
         if (item !is RowItem.StreamItem) return
         val stream = item.stream
+        if (stream !in orderedGhostLive) return
         Nav.openStream(context, stream.login, stream, ghostLiveCards.avatars[stream.userId],
-            ZapList(context.getString(R.string.ghost_follows_live), orderedGhostLive))
+            ZapList(context.getString(R.string.ghost_follows_live), orderedGhostLive), accountSession)
     }
 
     private fun openCategory(item: RowItem) {
