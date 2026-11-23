@@ -123,10 +123,7 @@ class SearchPage(
             // Twitch ranks exact-name offline accounts first; asking for live ones too keeps them on top.
             val liveChannels = async { runCatching { helix.searchChannels(query.trim(), liveOnly = true, session = requestedSession) } }
             val allChannels = async { runCatching { helix.searchChannels(query.trim(), session = requestedSession) } }
-            val foundChannels = liveChannels.await().fold(
-                onSuccess = { live -> allChannels.await().map { SearchLogic.liveFirst((live + it).distinctBy { c -> c.login }) } },
-                onFailure = { allChannels.await().map { SearchLogic.liveFirst(it) } },
-            )
+            val foundChannels = SearchLogic.mergeChannels(liveChannels.await(), allChannels.await())
             val foundCategories = async { runCatching { helix.searchCategories(query.trim(), requestedSession) } }
             ensureActive()
             if (helix.sessionId !== requestedSession) return@launch
