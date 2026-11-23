@@ -68,7 +68,7 @@ class CategoryActivity : Activity() {
         val name = intent.getStringExtra(EXTRA_NAME).orEmpty()
         val followView = findViewById<View>(R.id.category_follow)
         val pinView = findViewById<TextView>(R.id.category_pin)
-        FollowButton(followView, scope, app.follows, { app.tokens.userId }, ::requireLogin,
+        FollowButton(followView, scope, app.follows, app.tokens, ::requireLogin,
             pinButton = PinButton(pinView, followView, app.pins) { app.tokens.userId })
             .bind(FollowKind.CATEGORY, categoryId, name)
         findViewById<TextView>(R.id.category_name).text = name
@@ -174,16 +174,17 @@ class CategoryActivity : Activity() {
         followUpdates = scope.launch {
             app.followChanges.revisions.collectLatest { revision ->
                 val owner = account
+                val session = app.helix.sessionId
                 if (revision != followRevision) {
                     try {
-                        val streams = if (owner == null) emptyList() else app.helix.followedStreams(owner)
+                        val streams = if (owner == null) emptyList() else app.helix.followedStreams(owner, session)
                         ensureActive()
                         if (app.tokens.userId != owner) return@collectLatest
                         followedStreams = streams
                         followRevision = revision
                         followedLoadFailed = false
-                    } catch (_: NotLoggedInException) {
-                        requireLogin()
+                    } catch (e: NotLoggedInException) {
+                        requireLogin(e)
                         return@collectLatest
                     } catch (_: IOException) {
                         // Keep the public list usable and let the viewer retry the followed feed.
@@ -193,15 +194,15 @@ class CategoryActivity : Activity() {
                 val localRevision = app.ghostFollows.revision
                 if (localRevision != ghostRevision || homeIsStale(ghostLoadedAt, SystemClock.elapsedRealtime())) {
                     try {
-                        val streams = app.helix.streamsByUserIds(app.ghostFollows.ids(owner))
+                        val streams = app.helix.streamsByUserIds(app.ghostFollows.ids(owner), session)
                         ensureActive()
                         if (app.tokens.userId != owner) return@collectLatest
                         ghostStreams = streams
                         ghostRevision = localRevision
                         ghostLoadedAt = SystemClock.elapsedRealtime()
                         ghostLoadFailed = false
-                    } catch (_: NotLoggedInException) {
-                        requireLogin()
+                    } catch (e: NotLoggedInException) {
+                        requireLogin(e)
                         return@collectLatest
                     } catch (_: IOException) {
                         ghostLoadFailed = true
@@ -218,8 +219,8 @@ class CategoryActivity : Activity() {
         super.onStop()
     }
 
-    private fun requireLogin() {
-        app.tokens.clearLogin()
+    private fun requireLogin(error: NotLoggedInException) {
+        if (!error.clearLogin(app.tokens)) return
         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
         finish()
     }

@@ -2,6 +2,7 @@ package com.purpletv.twitch
 
 import android.util.Log
 import com.purpletv.auth.DeviceAuth
+import com.purpletv.auth.SessionId
 import com.purpletv.net.TwitchResponseException
 import com.purpletv.net.decodeTwitchObject
 import com.purpletv.net.requireResponseString
@@ -36,41 +37,48 @@ class PlaybackApi(
     private val usherBase: String = "https://usher.ttvnw.net/",
 ) {
     /** The master playlist URL of a live channel, checked to exist. */
-    suspend fun liveStreamUrl(login: String): String = withContext(Dispatchers.IO) {
-        val channel = login.trim().lowercase()
-        val token = requestToken(channel)
-        val url = usherBase.toHttpUrl().newBuilder()
-            .addPathSegments("api/channel/hls/$channel.m3u8")
-            .addQueryParameter("sig", token.signature)
-            .addQueryParameter("token", token.value)
-            .addQueryParameter("allow_source", "true")
-            .addQueryParameter("player_backend", "mediaplayer")
-            .addQueryParameter("playlist_include_framerate", "true")
-            .addQueryParameter("supported_codecs", "avc1")
-            .addQueryParameter("p", Random.nextInt(1_000_000).toString())
-            .build()
-        http.newCall(Request.Builder().url(url).build()).execute().use { response ->
-            if (response.code == 404) throw StreamOfflineException(channel)
-            if (!response.isSuccessful) throw IOException("usher answered HTTP ${response.code}")
+    suspend fun liveStreamUrl(login: String, session: SessionId = auth.sessionId): String = auth.sessionRequest(session) {
+        withContext(Dispatchers.IO) {
+            val channel = login.trim().lowercase()
+            val token = requestToken(channel, session)
+            val url = usherBase.toHttpUrl().newBuilder()
+                .addPathSegments("api/channel/hls/$channel.m3u8")
+                .addQueryParameter("sig", token.signature)
+                .addQueryParameter("token", token.value)
+                .addQueryParameter("allow_source", "true")
+                .addQueryParameter("player_backend", "mediaplayer")
+                .addQueryParameter("playlist_include_framerate", "true")
+                .addQueryParameter("supported_codecs", "avc1")
+                .addQueryParameter("p", Random.nextInt(1_000_000).toString())
+                .build()
+            val request = Request.Builder().url(url).build()
+            auth.execute(session, http.newCall(request)) { response ->
+                if (response.code == 404) throw StreamOfflineException(channel)
+                if (!response.isSuccessful) throw IOException("usher answered HTTP ${response.code}")
+            }
+            url.toString()
         }
-        url.toString()
     }
 
-    private suspend fun requestToken(channel: String): PlaybackToken {
-        val oauth = auth.accessToken
+    private suspend fun requestToken(channel: String, session: SessionId): PlaybackToken {
+        val credentials = auth.credentials(session)
+        val oauth = credentials.accessToken
         if (oauth != null) {
-            askForToken(channel, auth.clientId, oauth)?.let { return it }
-            if (auth.refresh(failed = oauth)) askForToken(channel, auth.clientId, auth.accessToken)?.let { return it }
+            askForToken(session, channel, auth.clientId, oauth)?.let { return it }
+            val renewed = auth.refresh(credentials)
+            if (renewed != null) {
+                askForToken(session, channel, auth.clientId, renewed)?.let { return it }
+            }
             // Play without the login rather than not at all; Helix decides whether to sign out.
             Log.i(TAG, "playback token refused, playing signed out")
         }
-        return askForToken(channel, WEB_CLIENT_ID, null) ?: throw TwitchResponseException()
+        return askForToken(session, channel, WEB_CLIENT_ID, null) ?: throw TwitchResponseException()
     }
 
     private class PlaybackToken(val signature: String, val value: String)
 
     /** The playback token, or null when Twitch refuses the OAuth token (HTTP 401). */
-    private fun askForToken(channel: String, clientId: String, oauth: String?): PlaybackToken? {
+    private suspend fun askForToken(session: SessionId, channel: String, clientId: String, oauth: String?): PlaybackToken? {
         val body = if (oauth != null) tvAppBody(channel) else webBody(channel)
         val request = Request.Builder()
             .url(gqlUrl)
@@ -78,11 +86,11 @@ class PlaybackApi(
             .apply { oauth?.let { header("Authorization", "OAuth $it") } }
             .post(body.toString().toRequestBody(JSON))
             .build()
-        val text = http.newCall(request).execute().use { response ->
-            if (response.code == 401 && oauth != null) return null
+        val text = auth.execute(session, http.newCall(request)) { response ->
+            if (response.code == 401 && oauth != null) return@execute null
             if (!response.isSuccessful) throw IOException("GQL answered HTTP ${response.code}")
             response.body?.string().orEmpty()
-        }
+        } ?: return null
         val root = decodeTwitchObject(text)
         if (root.has("errors") && root.optJSONArray("errors")?.length() != 0) throw TwitchResponseException()
         val data = root.optJSONObject("data") ?: throw TwitchResponseException()

@@ -15,7 +15,7 @@ class Pager<T>(
     private val scope: CoroutineScope,
     private val key: (T) -> String,
     private val fetch: suspend (cursor: String?) -> Page<T>,
-    private val onAuthRequired: () -> Unit = {},
+    private val onAuthRequired: (NotLoggedInException) -> Unit = {},
     private val onPage: (items: List<T>, failed: Boolean) -> Unit,
 ) {
     private val items = LinkedHashMap<String, T>()
@@ -71,7 +71,7 @@ class Pager<T>(
                 hasFailed = true
                 hasLoaded = true
                 onPage(items.values.toList(), true)
-                if (e is NotLoggedInException) onAuthRequired()
+                if (e is NotLoggedInException) onAuthRequired(e)
             } finally {
                 if (requestGeneration == generation) loading = false
             }

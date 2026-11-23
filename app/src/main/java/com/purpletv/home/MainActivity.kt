@@ -198,8 +198,9 @@ class MainActivity : Activity() {
         startActivityForResult(Intent(this, LoginActivity::class.java), REQ_LOGIN)
     }
 
-    private fun requireLogin() {
-        app.tokens.clearLogin()
+    private fun requireLogin(error: NotLoggedInException) {
+        if (!error.clearLogin(app.tokens)) return
+        loadedAtMs = 0
         following.bindAccount(null)
         login()
     }
@@ -207,22 +208,23 @@ class MainActivity : Activity() {
     private fun load() {
         loadedAtMs = SystemClock.elapsedRealtime()
         homeLoad?.cancel()
+        val session = app.auth.sessionId
         homeLoad = scope.launch {
             try {
-                val user = app.helix.me()
+                val user = app.helix.me(session)
                 ensureActive()
+                if (!app.tokens.updateUserId(session, user.id)) return@launch
                 me = user
-                app.tokens.userId = user.id
                 following.bindAccount(user.id)
                 home.clearPreviousAccount(user.id)
                 app.snapshot.meAvatar = user.profileImageUrl
                 rail.setAvatar(user.profileImageUrl)
-                home.load(user.id)
+                home.load(user.id, session)
+                if (app.auth.sessionId !== session) return@launch
                 refreshHomeGhostFollows(user.id)
                 search.refreshLiveSuggestions()
             } catch (e: NotLoggedInException) {
-                loadedAtMs = 0
-                login()
+                requireLogin(e)
             } catch (e: IOException) {
                 loadedAtMs = 0
                 home.showError()

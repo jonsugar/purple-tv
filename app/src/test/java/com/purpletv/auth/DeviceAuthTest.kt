@@ -26,7 +26,7 @@ class DeviceAuthTest {
     private val tokens = InMemoryTokenStore()
     private lateinit var auth: DeviceAuth
 
-    private val code = DeviceCode("d", "ABCD1234", "https://www.twitch.tv/activate", 1800, 5)
+    private val code get() = DeviceCode("d", "ABCD1234", "https://www.twitch.tv/activate", 1800, 5, tokens.session.id)
     private val startBody =
         """{"device_code":"d","user_code":"ABCD1234","verification_uri":"https://www.twitch.tv/activate","expires_in":1800,"interval":5}"""
 
@@ -123,9 +123,7 @@ class DeviceAuthTest {
 
     @Test
     fun pollRejectsIncompleteTokensWithoutChangingCredentials() = runTest {
-        tokens.accessToken = "old-access"
-        tokens.refreshToken = "old-refresh"
-        tokens.userId = "42"
+        tokens.signIn("old-access", "old-refresh", "42")
 
         val invalidBodies = listOf(
             "",
@@ -147,10 +145,10 @@ class DeviceAuthTest {
 
     @Test
     fun refreshStoresNewTokens() = runTest {
-        tokens.refreshToken = "r"
+        tokens.signIn("a", "r")
         server.enqueue(MockResponse().setBody("""{"access_token":"a2","refresh_token":"r2"}"""))
 
-        assertTrue(auth.refresh("a"))
+        assertEquals("a2", auth.refresh(tokens.session))
 
         val form = server.takeRequest().form()
         assertEquals("refresh_token", form["grant_type"])
@@ -163,24 +161,21 @@ class DeviceAuthTest {
 
     @Test
     fun refreshKeepsTheExistingRefreshTokenWhenOmitted() = runTest {
-        tokens.accessToken = "a"
-        tokens.refreshToken = "r"
+        tokens.signIn("a", "r")
         server.enqueue(MockResponse().setBody("""{"access_token":"a2"}"""))
 
-        assertTrue(auth.refresh("a"))
+        assertEquals("a2", auth.refresh(tokens.session))
         assertEquals("a2", tokens.accessToken)
         assertEquals("r", tokens.refreshToken)
     }
 
     @Test
     fun refreshRejectsInvalidTokensWithoutChangingCredentials() = runTest {
-        tokens.accessToken = "a"
-        tokens.refreshToken = "r"
-        tokens.userId = "42"
+        tokens.signIn("a", "r", "42")
 
         for (body in listOf("""{"refresh_token":"r2"}""", """{"access_token":"a2","refresh_token":null}""")) {
             server.enqueue(MockResponse().setBody(body))
-            expectResponseError { auth.refresh("a") }
+            expectResponseError { auth.refresh(tokens.session) }
             assertEquals("a", tokens.accessToken)
             assertEquals("r", tokens.refreshToken)
             assertEquals("42", tokens.userId)
@@ -189,26 +184,26 @@ class DeviceAuthTest {
 
     @Test
     fun refreshFailsOn400() = runTest {
-        tokens.refreshToken = "r"
+        tokens.signIn("a", "r")
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"status":400,"message":"Invalid refresh token"}"""))
 
-        assertFalse(auth.refresh("a"))
+        assertNull(auth.refresh(tokens.session))
     }
 
     @Test
     fun parallel401sRefreshOnce() = runTest {
         // Twitch takes each refresh token once: a second refresh with r1 would get a 400.
-        tokens.accessToken = "a1"
-        tokens.refreshToken = "r1"
+        tokens.signIn("a1", "r1")
         server.enqueue(MockResponse().setHeadersDelay(300, TimeUnit.MILLISECONDS)
             .setBody("""{"access_token":"a2","refresh_token":"r2"}"""))
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"status":400,"message":"Invalid refresh token"}"""))
 
-        val first = async { auth.refresh("a1") }
-        val second = async { auth.refresh("a1") }
+        val failed = tokens.session
+        val first = async { auth.refresh(failed) }
+        val second = async { auth.refresh(failed) }
 
-        assertTrue(first.await())
-        assertTrue(second.await())
+        assertEquals("a2", first.await())
+        assertEquals("a2", second.await())
         assertEquals(1, server.requestCount)
         assertEquals("a2", tokens.accessToken)
         assertEquals("r2", tokens.refreshToken)

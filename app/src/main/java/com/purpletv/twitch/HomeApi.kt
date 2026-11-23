@@ -1,6 +1,7 @@
 package com.purpletv.twitch
 
 import com.purpletv.auth.DeviceAuth
+import com.purpletv.auth.SessionId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -36,21 +37,23 @@ class HomeApi(
     private val language: String = Locale.getDefault().toLanguageTag(),
     private val deviceId: String = "",
 ) {
-    suspend fun shelves(): List<Shelf> = withContext(Dispatchers.IO) {
-        val oauth = auth.accessToken ?: throw NotLoggedInException()
-        val text = ask(oauth) ?: run {
-            if (!auth.refresh(failed = oauth)) throw IOException("Home rows refused")
-            ask(auth.accessToken ?: throw NotLoggedInException()) ?: throw IOException("Home rows refused")
-        }
-        try {
-            parse(text)
-        } catch (e: JSONException) {
-            throw IOException("unexpected Home rows answer", e)
+    suspend fun shelves(session: SessionId = auth.sessionId): List<Shelf> = auth.sessionRequest(session) {
+        withContext(Dispatchers.IO) {
+            val credentials = auth.credentials(session)
+            val text = ask(session, credentials.requireAccessToken()) ?: run {
+                val renewed = auth.refresh(credentials) ?: throw IOException("Home rows refused")
+                ask(session, renewed) ?: throw IOException("Home rows refused")
+            }
+            try {
+                parse(text)
+            } catch (e: JSONException) {
+                throw IOException("unexpected Home rows answer", e)
+            }
         }
     }
 
     /** The answer, or null on a 401. */
-    private fun ask(oauth: String): String? {
+    private suspend fun ask(session: SessionId, oauth: String): String? {
         val body = JSONObject()
             .put("operationName", "Homepage_Query")
             .put("query", QUERY)
@@ -66,8 +69,8 @@ class HomeApi(
             .apply { if (deviceId.isNotEmpty()) header("Device-Id", deviceId) }
             .post(body.toString().toRequestBody(JSON))
             .build()
-        return http.newCall(request).execute().use { response ->
-            if (response.code == 401) return null
+        return auth.execute(session, http.newCall(request)) { response ->
+            if (response.code == 401) return@execute null
             if (!response.isSuccessful) throw IOException("GQL answered HTTP ${response.code}")
             response.body?.string().orEmpty()
         }

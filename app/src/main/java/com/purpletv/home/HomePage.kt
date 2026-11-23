@@ -15,6 +15,8 @@ import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import coil.transform.CircleCropTransformation
 import com.purpletv.R
+import com.purpletv.auth.SessionChangedException
+import com.purpletv.auth.SessionId
 import com.purpletv.player.ZapList
 import com.purpletv.twitch.FollowKind
 import com.purpletv.twitch.HelixClient
@@ -77,21 +79,23 @@ class HomePage(
     fun stop() = hero.cancel()
 
     /** Loads the rows; only a lost login escapes as [NotLoggedInException]. */
-    suspend fun load(userId: String) = coroutineScope {
-        val followedStreams = async { runCatching { helix.followedStreams(userId) } }
-        val shelves = async { runCatching { loadRecommendations() } }
+    suspend fun load(userId: String, session: SessionId) = coroutineScope {
+        val followedStreams = async { runCatching { helix.followedStreams(userId, session) } }
+        val shelves = async { runCatching { loadRecommendations(session) } }
         val followedResult = followedStreams.await()
         (followedResult.exceptionOrNull() as? NotLoggedInException)?.let { throw it }
         val recommendations = shelves.await()
         (recommendations.exceptionOrNull() as? NotLoggedInException)?.let { throw it }
+        if (helix.sessionId !== session) throw SessionChangedException()
         val below = recommendations
             .onFailure { Log.w(TAG, "home rows unavailable: ${it.message}") }
             .getOrDefault(emptyList())
         below.forEach {
             Log.i(TAG, "home row ${it.rowName} \"${it.title}\" streams=${it.streams.size} categories=${it.categories.size}")
         }
-        val lower = if (below.isNotEmpty()) below.map(::shelfRow) else helixRows()
+        val lower = if (below.isNotEmpty()) below.map(::shelfRow) else helixRows(session)
         coroutineContext.ensureActive()
+        if (helix.sessionId !== session) throw SessionChangedException()
         val followed = HomeRow(
             context.getString(R.string.row_followed), RowKind.STREAMS,
             followedResult.map { list -> list.map { RowItem.StreamItem(it) } }, emptyText = R.string.followed_empty,
@@ -107,8 +111,11 @@ class HomePage(
         // Twitch's rows carry their avatars; the followed row and the fallback ask Helix for them.
         val bareIds = (listOf(followed) + lower).filter { it.avatars.isEmpty() }
             .flatMap { row -> row.items.getOrDefault(emptyList()).mapNotNull { (it as? RowItem.StreamItem)?.stream?.userId } }
-        val urls = runCatching { avatars.urls(bareIds) }.getOrDefault(emptyMap())
+        val avatarResult = runCatching { avatars.urls(bareIds, session) }
+        (avatarResult.exceptionOrNull() as? NotLoggedInException)?.let { throw it }
+        val urls = avatarResult.getOrDefault(emptyMap())
         coroutineContext.ensureActive()
+        if (helix.sessionId !== session) throw SessionChangedException()
         if (urls.isNotEmpty()) {
             sourceRows = sourceRows.map { if (it.avatars.isEmpty()) it.copy(avatars = urls) else it }
             adapter.addAvatars(urls)
@@ -231,19 +238,19 @@ class HomePage(
         if (shelf.streams.isNotEmpty()) HomeRow(shelf.title, RowKind.STREAMS, Result.success(shelf.streams.map { RowItem.StreamItem(it) }), shelf.avatars)
         else HomeRow(shelf.title, RowKind.CATEGORIES, Result.success(shelf.categories.map { RowItem.CategoryItem(it) }))
 
-    private suspend fun loadRecommendations(): List<Shelf> {
-        val shelves = rowsBelowFollowed(homeApi.shelves())
+    private suspend fun loadRecommendations(session: SessionId): List<Shelf> {
+        val shelves = rowsBelowFollowed(homeApi.shelves(session))
         val ids = shelves.flatMap { shelf -> shelf.streams.map(Stream::userId) }.filter(String::isNotEmpty)
-        val metadata = helix.streamsByUserIds(ids).associateBy(Stream::userId)
+        val metadata = helix.streamsByUserIds(ids, session).associateBy(Stream::userId)
         return shelves.map { shelf ->
             shelf.copy(streams = shelf.streams.map { it.copy(language = metadata[it.userId]?.language.orEmpty()) })
         }
     }
 
     /** The rows Home had before Twitch's own: the most watched streams and categories. */
-    private suspend fun helixRows(): List<HomeRow> = coroutineScope {
-        val topStreams = async { runCatching { helix.topStreams().items } }
-        val topCategories = async { runCatching { helix.topCategories().items } }
+    private suspend fun helixRows(session: SessionId): List<HomeRow> = coroutineScope {
+        val topStreams = async { runCatching { helix.topStreams(session = session).items } }
+        val topCategories = async { runCatching { helix.topCategories(session = session).items } }
         listOf(topStreams.await(), topCategories.await())
             .firstNotNullOfOrNull { it.exceptionOrNull() as? NotLoggedInException }?.let { throw it }
         listOf(

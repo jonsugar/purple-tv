@@ -3,18 +3,20 @@ package com.purpletv.auth
 import com.purpletv.net.TwitchResponseException
 import com.purpletv.net.decodeTwitchObject
 import com.purpletv.net.requireResponseString
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import org.json.JSONObject
 import java.io.IOException
+import kotlin.coroutines.resumeWithException
 
 data class DeviceCode(
     val deviceCode: String,
@@ -22,6 +24,7 @@ data class DeviceCode(
     val verificationUri: String,
     val expiresInSec: Int,
     val intervalSec: Int,
+    internal val session: SessionId,
 )
 
 class DeviceCodeExpiredException : IOException("device code expired")
@@ -38,12 +41,58 @@ class DeviceAuth(
     baseUrl: String = "https://id.twitch.tv/oauth2/",
 ) {
     private val base = baseUrl.toHttpUrl()
-    private val refreshing = Mutex()
+    val sessionId: SessionId get() = tokens.session.id
 
-    val accessToken: String? get() = tokens.accessToken
+    internal fun credentials(session: SessionId): LoginSession =
+        tokens.session.takeIf { it.id === session } ?: throw SessionChangedException()
+
+    internal fun requireCurrent(session: SessionId) {
+        credentials(session)
+    }
+
+    internal fun runIfCurrent(session: SessionId, action: () -> Unit) {
+        if (!tokens.runIfCurrent(session, action)) throw SessionChangedException()
+    }
+
+    /** Checks the session on both sides of a request, including when the request fails. */
+    internal inline fun <T> sessionRequest(session: SessionId, request: () -> T): T {
+        requireCurrent(session)
+        try {
+            return request()
+        } finally {
+            requireCurrent(session)
+        }
+    }
+
+    /** Submits the call only while its session is current. The response is consumed off the caller thread. */
+    internal suspend fun <T> execute(session: SessionId, call: Call, read: (Response) -> T): T {
+        try {
+            return suspendCancellableCoroutine { continuation ->
+                continuation.invokeOnCancellation { call.cancel() }
+                val callback = object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        continuation.resumeWithException(e)
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        continuation.resumeWith(runCatching { response.use(read) })
+                    }
+                }
+                runIfCurrent(session) {
+                    if (continuation.isActive) {
+                        session.calls.add(call)
+                        call.enqueue(callback)
+                    }
+                }
+            }
+        } finally {
+            runIfCurrent(session) { session.calls.remove(call) }
+        }
+    }
 
     suspend fun start(): DeviceCode {
-        val json = post("device", FormBody.Builder()
+        val session = sessionId
+        val json = post(session, "device", FormBody.Builder()
             .add("client_id", clientId)
             .add("scopes", scopes)
             .build()).requireOk()
@@ -55,6 +104,7 @@ class DeviceAuth(
             verificationUri = verificationUri,
             expiresInSec = json.requirePositiveInt("expires_in"),
             intervalSec = json.requirePositiveInt("interval"),
+            session = session,
         )
     }
 
@@ -63,14 +113,14 @@ class DeviceAuth(
         var intervalSec = code.intervalSec
         while (true) {
             delay(intervalSec * 1_000L)
-            val reply = post("token", FormBody.Builder()
+            val reply = post(code.session, "token", FormBody.Builder()
                 .add("client_id", clientId)
                 .add("scopes", scopes)
                 .add("device_code", code.deviceCode)
                 .add("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
                 .build())
             if (reply.ok) {
-                store(reply.requireOk())
+                if (!tokens.signIn(code.session, decodeTokens(reply.requireOk()))) throw SessionChangedException()
                 return
             }
             when (reply.errorMessage()) {
@@ -82,26 +132,28 @@ class DeviceAuth(
         }
     }
 
-    /**
-     * Swaps the refresh token for new tokens; false when Twitch no longer accepts it. [failed] is
-     * the access token that got the 401: Twitch takes each refresh token once, so calls that fail
-     * together refresh one at a time, and a call whose token was already replaced uses the new one.
-     */
-    suspend fun refresh(failed: String?): Boolean = refreshing.withLock {
-        val current = tokens.accessToken
-        if (current != null && current != failed) return true
-        val refreshToken = tokens.refreshToken ?: return false
-        val reply = post("token", FormBody.Builder()
+    /** Returns the renewed access token, or null when Twitch refuses the refresh. */
+    suspend fun refresh(failed: LoginSession): String? = failed.id.refreshing.withLock {
+        val current = credentials(failed.id)
+        // Requests that used the same credential pair share its refresh result.
+        if (current.tokens !== failed.tokens) return current.accessToken
+        if (failed.id.refusedRefresh === current.tokens) return null
+        val refreshToken = current.refreshToken ?: return null
+        val reply = post(failed.id, "token", FormBody.Builder()
             .add("client_id", clientId)
             .add("grant_type", "refresh_token")
             .add("refresh_token", refreshToken)
             .build())
-        if (reply.code == 400 || reply.code == 401) return false
-        store(reply.requireOk(), refreshToken)
-        return true
+        if (reply.code == 400 || reply.code == 401) {
+            failed.id.refusedRefresh = current.tokens
+            return null
+        }
+        val renewed = decodeTokens(reply.requireOk(), refreshToken)
+        if (!tokens.updateTokens(failed.id, renewed)) throw SessionChangedException()
+        return renewed.accessToken
     }
 
-    private fun store(json: JSONObject, previousRefreshToken: String? = null) {
+    private fun decodeTokens(json: JSONObject, previousRefreshToken: String? = null): LoginTokens {
         val accessToken = json.requireResponseString("access_token")
         // The access token is sent in HTTP headers.
         if (accessToken.any { it !in '!'..'~' }) throw TwitchResponseException()
@@ -110,8 +162,7 @@ class DeviceAuth(
         } else {
             json.requireResponseString("refresh_token")
         }
-        tokens.accessToken = accessToken
-        tokens.refreshToken = refreshToken
+        return LoginTokens(accessToken, refreshToken)
     }
 
     private fun JSONObject.requirePositiveInt(key: String): Int =
@@ -128,9 +179,9 @@ class DeviceAuth(
         }
     }
 
-    private suspend fun post(path: String, form: FormBody): Reply = withContext(Dispatchers.IO) {
+    private suspend fun post(session: SessionId, path: String, form: FormBody): Reply {
         val request = Request.Builder().url(base.resolve(path)!!).post(form).build()
-        http.newCall(request).execute().use { response ->
+        return execute(session, http.newCall(request)) { response ->
             Reply(response.code, response.body?.string().orEmpty())
         }
     }

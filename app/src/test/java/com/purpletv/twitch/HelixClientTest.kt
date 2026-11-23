@@ -2,6 +2,7 @@ package com.purpletv.twitch
 
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
+import com.purpletv.auth.signIn
 import com.purpletv.net.TwitchResponseException
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
@@ -25,8 +26,7 @@ class HelixClientTest {
     @Before
     fun setUp() {
         server.start()
-        tokens.accessToken = "a"
-        tokens.refreshToken = "r"
+        tokens.signIn("a", "r")
         val http = OkHttpClient()
         val auth = DeviceAuth(http, CLIENT_ID, "user:read:follows", tokens, server.url("/oauth2/").toString())
         helix = HelixClient(http, tokens, auth, server.url("/helix/").toString())
@@ -63,7 +63,7 @@ class HelixClientTest {
 
     @Test
     fun invalidSuccessfulProfilesUseTheResponseErrorPath() = runTest {
-        tokens.userId = "42"
+        tokens.updateUserId(tokens.session.id, "42")
         val invalidBodies = listOf(
             "",
             """{"data":[""",
@@ -226,7 +226,7 @@ class HelixClientTest {
 
     @Test
     fun invalidRefreshResponseLeavesTheProfileSessionIntact() = runTest {
-        tokens.userId = "42"
+        tokens.updateUserId(tokens.session.id, "42")
         server.enqueue(MockResponse().setResponseCode(401))
         server.enqueue(MockResponse().setBody("""{"access_token":"a2","refresh_token":null}"""))
 

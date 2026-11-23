@@ -2,6 +2,7 @@ package com.purpletv.twitch
 
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
+import com.purpletv.auth.signIn
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
@@ -23,7 +24,7 @@ class FollowApiTest {
     @Before fun setup() {
         server.start()
         val http = OkHttpClient()
-        val tokens = InMemoryTokenStore().apply { accessToken = "old"; refreshToken = "refresh" }
+        val tokens = InMemoryTokenStore().apply { signIn("old", "refresh") }
         val auth = DeviceAuth(http, "tv-client", "user_read user:read:follows", tokens, server.url("/oauth2/").toString())
         api = FollowApi(TwitchGraphQl(http, auth, server.url("/gql").toString()), changes)
     }

@@ -1,13 +1,8 @@
 package com.purpletv.auth
 
-class InMemoryTokenStore : TokenStore {
-    override var accessToken: String? = null
-    override var refreshToken: String? = null
-    override var userId: String? = null
+class InMemoryTokenStore : TokenStore by PrefsTokenStore(FakePrefs())
 
-    override fun clearLogin() {
-        accessToken = null
-        refreshToken = null
-        userId = null
-    }
+fun TokenStore.signIn(accessToken: String, refreshToken: String? = null, userId: String? = null) {
+    check(signIn(session.id, LoginTokens(accessToken, refreshToken)))
+    if (userId != null) check(updateUserId(session.id, userId))
 }

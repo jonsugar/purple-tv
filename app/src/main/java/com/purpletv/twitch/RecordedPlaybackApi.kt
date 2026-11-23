@@ -1,7 +1,6 @@
 package com.purpletv.twitch
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.purpletv.auth.SessionId
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
@@ -19,8 +18,8 @@ class RecordedPlaybackApi(
     private val gql: TwitchGraphQl,
     private val usherBase: String = "https://usher.ttvnw.net/",
 ) {
-    suspend fun vodUrl(id: String): String {
-        val data = gql.query("RecordedAccessToken", VOD_QUERY, JSONObject().put("id", id))
+    suspend fun vodUrl(id: String, session: SessionId = gql.sessionId): String = gql.sessionRequest(session) {
+        val data = gql.query("RecordedAccessToken", VOD_QUERY, JSONObject().put("id", id), session)
         val token = data.optJSONObject("videoPlaybackAccessToken") ?: throw RecordingUnavailableException()
         val value = token.optString("value").takeIf { it.isNotEmpty() && it != "null" } ?: throw RecordingUnavailableException()
         val signature = token.optString("signature").takeIf { it.isNotEmpty() && it != "null" } ?: throw RecordingUnavailableException()
@@ -29,13 +28,12 @@ class RecordedPlaybackApi(
             .addQueryParameter("nauthsig", signature)
             .addQueryParameter("allow_source", "true").addQueryParameter("allow_audio_only", "true")
             .addQueryParameter("player_backend", "mediaplayer").addQueryParameter("supported_codecs", "avc1").build()
-        withContext(Dispatchers.IO) {
-            http.newCall(Request.Builder().url(url).build()).execute().use {
-                if (it.code == 403 || it.code == 404) throw RecordingUnavailableException()
-                if (!it.isSuccessful) throw IOException("Recording playlist HTTP ${it.code}")
-            }
+        val request = Request.Builder().url(url).build()
+        gql.execute(session, http.newCall(request)) {
+            if (it.code == 403 || it.code == 404) throw RecordingUnavailableException()
+            if (!it.isSuccessful) throw IOException("Recording playlist HTTP ${it.code}")
         }
-        return url.toString()
+        url.toString()
     }
 
     suspend fun clipRenditions(id: String): List<ClipRendition> {

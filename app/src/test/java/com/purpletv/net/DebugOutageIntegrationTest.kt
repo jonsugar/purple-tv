@@ -18,6 +18,7 @@ import com.purpletv.PurpleApp
 import com.purpletv.R
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
+import com.purpletv.auth.signIn
 import com.purpletv.twitch.FollowApi
 import com.purpletv.twitch.FollowChanges
 import com.purpletv.twitch.FollowKind
@@ -53,7 +54,7 @@ class DebugOutageIntegrationTest {
     fun unfollowFailsAfterFollowingWasReadAndSameControlCanRetry() {
         MockWebServer().use { server ->
             val app = RuntimeEnvironment.getApplication() as PurpleApp
-            val tokens = InMemoryTokenStore().apply { accessToken = "saved"; refreshToken = "refresh"; userId = "42" }
+            val tokens = InMemoryTokenStore().apply { signIn("saved", "refresh", "42") }
             val auth = DeviceAuth(app.http, "tv", "", tokens, server.url("/oauth2/").toString())
             val changes = FollowChanges()
             val api = FollowApi(TwitchGraphQl(app.http, auth, server.url("/gql").toString()), changes, app.pins::remove)
@@ -64,7 +65,7 @@ class DebugOutageIntegrationTest {
             activity.setContentView(LinearLayout(activity).apply { addView(button); addView(pin) })
             try {
                 server.enqueue(MockResponse().setBody("""{"data":{"currentUser":{"followedGames":{"nodes":[{"id":"deadlock"}]}}}}"""))
-                FollowButton(button, scope, api, { tokens.userId }, { fail("Outage must not ask for sign-in") },
+                FollowButton(button, scope, api, tokens, { fail("Outage must not ask for sign-in") },
                     pinButton = PinButton(pin, button, app.pins) { tokens.userId })
                     .bind(FollowKind.CATEGORY, "deadlock", "Deadlock")
                 waitUntil { button.text == app.getString(R.string.following_state) }

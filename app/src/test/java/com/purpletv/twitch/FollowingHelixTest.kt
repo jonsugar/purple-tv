@@ -2,6 +2,7 @@ package com.purpletv.twitch
 
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
+import com.purpletv.auth.signIn
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -16,7 +17,7 @@ class FollowingHelixTest {
     private lateinit var api: HelixClient
     @Before fun setup() {
         server.start()
-        val tokens = InMemoryTokenStore().apply { accessToken = "token" }
+        val tokens = InMemoryTokenStore().apply { signIn("token") }
         val http = OkHttpClient()
         api = HelixClient(http, tokens, DeviceAuth(http, "client", "user:read:follows", tokens), server.url("/helix/").toString())
     }

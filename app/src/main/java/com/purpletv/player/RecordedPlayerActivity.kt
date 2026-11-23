@@ -175,7 +175,7 @@ class RecordedPlayerActivity : Activity() {
                 player.prepare()
                 player.playWhenReady = playWhenReady
             } catch (e: NotLoggedInException) {
-                requireLogin()
+                requireLogin(e)
             } catch (e: IOException) {
                 showError(e is RecordingUnavailableException)
             }
@@ -264,8 +264,8 @@ class RecordedPlayerActivity : Activity() {
         findViewById<View>(R.id.recorded_retry).requestFocus()
     }
 
-    private fun requireLogin() {
-        app.tokens.clearLogin()
+    private fun requireLogin(error: NotLoggedInException) {
+        if (!error.clearLogin(app.tokens)) return
         openMain()
     }
 

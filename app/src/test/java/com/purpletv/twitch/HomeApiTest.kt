@@ -2,6 +2,7 @@ package com.purpletv.twitch
 
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
+import com.purpletv.auth.signIn
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -23,8 +24,7 @@ class HomeApiTest {
     @Before
     fun setUp() {
         server.start()
-        tokens.accessToken = "a"
-        tokens.refreshToken = "r1"
+        tokens.signIn("a", "r1")
         val auth = DeviceAuth(OkHttpClient(), TV_CLIENT_ID, "user_read user:read:follows", tokens, server.url("/oauth2/").toString())
         api = HomeApi(OkHttpClient(), auth, server.url("/gql").toString(), language = "it-IT", deviceId = "d3v1c3")
     }

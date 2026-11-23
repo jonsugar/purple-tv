@@ -52,7 +52,7 @@ class ChannelActivity : Activity() {
         account = app.tokens.userId
         setContentView(R.layout.activity_channel)
         val followView = findViewById<View>(R.id.channel_follow)
-        followButton = FollowButton(followView, scope, app.follows, { app.tokens.userId }, ::requireLogin,
+        followButton = FollowButton(followView, scope, app.follows, app.tokens, ::requireLogin,
             pinButton = PinButton(findViewById(R.id.channel_pin), followView, app.pins) { app.tokens.userId })
         val ghostView = findViewById<View>(R.id.channel_ghost_follow)
         ghostButton = GhostFollowButton(ghostView, app.ghostFollows, { app.tokens.userId })
@@ -88,7 +88,7 @@ class ChannelActivity : Activity() {
     override fun onStart() {
         super.onStart()
         if (app.tokens.userId != account) { openMain(Screen.FOLLOWING); return }
-        if (app.tokens.accessToken == null) { requireLogin(); return }
+        if (app.tokens.accessToken == null) { openMain(Screen.FOLLOWING); return }
         if (!loaded) load() else {
             followButton.bind(FollowKind.CHANNEL, broadcasterId, broadcasterName)
             ghostButton.bind(broadcasterId, broadcasterLogin, broadcasterName)
@@ -124,7 +124,7 @@ class ChannelActivity : Activity() {
             } catch (e: IOException) {
                 findViewById<TextView>(R.id.channel_status).setText(R.string.row_error)
                 findViewById<View>(R.id.channel_retry).visibility = View.VISIBLE
-                if (e is NotLoggedInException) requireLogin()
+                if (e is NotLoggedInException) requireLogin(e)
             }
         }
     }
@@ -138,7 +138,7 @@ class ChannelActivity : Activity() {
                     listOf(it.gameName, viewersText(it.viewers)).filter(String::isNotEmpty).joinToString(" · ")
                 } ?: getString(R.string.offline)
             } catch (e: IOException) {
-                if (e is NotLoggedInException) requireLogin()
+                if (e is NotLoggedInException) requireLogin(e)
                 else findViewById<TextView>(R.id.channel_state).setText(R.string.channel_status_unavailable)
             }
         }
@@ -149,7 +149,9 @@ class ChannelActivity : Activity() {
         finish()
     }
 
-    private fun requireLogin() { app.tokens.clearLogin(); openMain(Screen.FOLLOWING) }
+    private fun requireLogin(error: NotLoggedInException) {
+        if (error.clearLogin(app.tokens)) openMain(Screen.FOLLOWING)
+    }
 
     override fun onDestroy() { scope.cancel(); super.onDestroy() }
 

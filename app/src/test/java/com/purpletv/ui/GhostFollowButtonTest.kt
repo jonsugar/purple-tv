@@ -10,6 +10,7 @@ import android.widget.TextView
 import com.purpletv.PurpleApp
 import com.purpletv.R
 import com.purpletv.auth.DeviceAuth
+import com.purpletv.auth.signIn
 import com.purpletv.channel.ChannelActivity
 import com.purpletv.home.FavouritePin
 import com.purpletv.home.GhostFollow
@@ -83,7 +84,7 @@ class GhostFollowButtonTest {
         assertEquals(listOf(pin), app.pins.list(account, FollowKind.CHANNEL))
 
         // Only the independent Twitch action removes the pin. The local ghost survives.
-        runBlocking { app.follows.unfollow(FollowKind.CHANNEL, channel.id, account) }
+        runBlocking { app.follows.unfollow(FollowKind.CHANNEL, channel.id) }
         assertEquals(emptyList<FavouritePin>(), app.pins.list(account, FollowKind.CHANNEL))
         assertEquals(listOf(channel), app.ghostFollows.list(account))
         controller.pause().stop().restart().resume()
@@ -107,7 +108,7 @@ class GhostFollowButtonTest {
 
         val restartedStore = GhostFollowStore(app.getSharedPreferences("ghost_follows", Context.MODE_PRIVATE))
         assertEquals(listOf(channel), restartedStore.list(account))
-        app.tokens.userId = "account-b"
+        app.tokens.signIn("test-token", userId = "account-b")
         assertTrue(icon.performClick())
         assertEquals(listOf(channel), restartedStore.list(account))
         assertEquals(emptyList<GhostFollow>(), restartedStore.list("account-b"))
@@ -120,8 +121,7 @@ class GhostFollowButtonTest {
     }
 
     private fun stubTwitch(): OkHttpClient {
-        app.tokens.userId = account
-        app.tokens.accessToken = "test-token"
+        app.tokens.signIn("test-token", userId = account)
         val http = OkHttpClient.Builder().eventListener(object : EventListener() {
             override fun callStart(call: Call) { calls.incrementAndGet() }
         }).addInterceptor { chain ->

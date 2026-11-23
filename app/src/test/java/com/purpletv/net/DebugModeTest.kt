@@ -2,6 +2,7 @@ package com.purpletv.net
 
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
+import com.purpletv.auth.signIn
 import com.purpletv.twitch.NotLoggedInException
 import com.purpletv.twitch.TwitchGraphQl
 import kotlinx.coroutines.test.runTest
@@ -33,11 +34,7 @@ class DebugModeTest {
         MockWebServer().use { server ->
             val mode = DebugMode().apply { setEnabled(true) }
             val http = Http.client(mode)
-            val tokens = InMemoryTokenStore().apply {
-                accessToken = "saved"
-                refreshToken = "refresh"
-                userId = "42"
-            }
+            val tokens = InMemoryTokenStore().apply { signIn("saved", "refresh", "42") }
             val auth = DeviceAuth(http, "tv", "", tokens, server.url("/oauth2/").toString())
             val gql = TwitchGraphQl(http, auth, server.url("/gql").toString())
             val query = "{ ok }"
@@ -48,7 +45,7 @@ class DebugModeTest {
 
             assertConnectionFailure { gql.query("Test", query) }
             assertConnectionFailure { auth.start() }
-            assertConnectionFailure { auth.refresh("saved") }
+            assertConnectionFailure { auth.refresh(tokens.session) }
             assertEquals(1, server.requestCount)
             assertEquals("saved", tokens.accessToken)
             assertEquals("refresh", tokens.refreshToken)

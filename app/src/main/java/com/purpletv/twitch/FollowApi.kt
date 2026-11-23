@@ -1,5 +1,6 @@
 package com.purpletv.twitch
 
+import com.purpletv.auth.SessionId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -25,65 +26,67 @@ class FollowApi(
 ) {
     private val unfollowRequest = Mutex()
 
-    suspend fun isFollowing(kind: FollowKind, id: String): Boolean = when (kind) {
+    suspend fun isFollowing(kind: FollowKind, id: String, session: SessionId = gql.sessionId): Boolean = when (kind) {
         FollowKind.CHANNEL -> {
-            val user = gql.query("ChannelFollowState", CHANNEL_STATE, JSONObject().put("id", id)).optJSONObject("user")
+            val user = gql.query("ChannelFollowState", CHANNEL_STATE, JSONObject().put("id", id), session).optJSONObject("user")
                 ?: throw IOException("Channel unavailable")
-            val self = user.optJSONObject("self") ?: throw NotLoggedInException()
+            val self = user.optJSONObject("self") ?: throw NotLoggedInException(session)
             self.optJSONObject("follower") != null
         }
         FollowKind.CATEGORY -> {
             // Unlike LIVE, ALL includes followed categories that currently have no streams.
-            val user = gql.query("CategoryFollowState", CATEGORY_STATE).optJSONObject("currentUser") ?: throw NotLoggedInException()
+            val user = gql.query("CategoryFollowState", CATEGORY_STATE, session = session).optJSONObject("currentUser") ?: throw NotLoggedInException(session)
             val nodes = user.optJSONObject("followedGames")?.optJSONArray("nodes") ?: throw IOException("Missing category follows")
             (0 until nodes.length()).any { nodes.optJSONObject(it)?.optString("id") == id }
         }
     }
 
-    suspend fun follow(kind: FollowKind, id: String) {
+    suspend fun follow(kind: FollowKind, id: String, session: SessionId = gql.sessionId) {
         if (id.isBlank()) throw IOException("Missing follow target")
         when (kind) {
             FollowKind.CHANNEL -> {
                 val input = JSONObject().put("targetID", id).put("disableNotifications", false)
-                val result = gql.mutate("FollowChannel", FOLLOW_CHANNEL, JSONObject().put("input", input))
+                val result = gql.mutate("FollowChannel", FOLLOW_CHANNEL, JSONObject().put("input", input), session)
                 val follow = result.optJSONObject("followUser")?.optJSONObject("follow")
                     ?: throw IOException("Channel follow was not confirmed")
                 if (follow.optString("followedAt").let { it.isBlank() || it == "null" }) throw IOException("Channel follow was not confirmed")
             }
             FollowKind.CATEGORY -> {
-                val result = gql.mutate("FollowCategory", FOLLOW_CATEGORY, JSONObject().put("input", JSONObject().put("gameID", id)))
+                val result = gql.mutate("FollowCategory", FOLLOW_CATEGORY, JSONObject().put("input", JSONObject().put("gameID", id)), session)
                 if (result.optJSONObject("followGame")?.optJSONObject("game")?.optString("id") != id) {
                     throw IOException("Category follow was not confirmed")
                 }
             }
         }
-        changes.changed()
+        gql.runIfCurrent(session) { changes.changed() }
     }
 
-    suspend fun unfollow(kind: FollowKind, id: String, accountId: String? = null) {
+    suspend fun unfollow(kind: FollowKind, id: String, session: SessionId = gql.sessionId) {
         if (id.isBlank()) throw IOException("Missing unfollow target")
         if (!unfollowRequest.tryLock()) throw IOException("Another unfollow is in progress")
         try {
-            requestUnfollow(kind, id)
-            onUnfollowed(accountId, kind, id)
-            changes.changed()
+            requestUnfollow(kind, id, session)
+            gql.runIfCurrent(session) {
+                onUnfollowed(gql.credentials(session).userId, kind, id)
+                changes.changed()
+            }
         } finally {
             unfollowRequest.unlock()
         }
     }
 
-    private suspend fun requestUnfollow(kind: FollowKind, id: String) {
+    private suspend fun requestUnfollow(kind: FollowKind, id: String, session: SessionId) {
         when (kind) {
             FollowKind.CHANNEL -> {
                 val input = JSONObject().put("targetID", id)
-                val result = gql.mutate("UnfollowChannel", UNFOLLOW_CHANNEL, JSONObject().put("input", input))
+                val result = gql.mutate("UnfollowChannel", UNFOLLOW_CHANNEL, JSONObject().put("input", input), session)
                 if (result.optJSONObject("unfollowUser")?.optString("__typename") != "UnfollowUserPayload" ||
-                    isFollowing(kind, id)
+                    isFollowing(kind, id, session)
                 ) throw IOException("Channel unfollow was not confirmed")
             }
             FollowKind.CATEGORY -> {
                 val input = JSONObject().put("gameID", id)
-                val result = gql.mutate("UnfollowCategory", UNFOLLOW_CATEGORY, JSONObject().put("input", input))
+                val result = gql.mutate("UnfollowCategory", UNFOLLOW_CATEGORY, JSONObject().put("input", input), session)
                 if (result.optJSONObject("unfollowGame")?.optJSONObject("game")?.optString("id") != id) {
                     throw IOException("Category unfollow was not confirmed")
                 }

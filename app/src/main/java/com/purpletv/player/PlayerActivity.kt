@@ -130,8 +130,8 @@ class PlayerActivity : Activity() {
         followView = findViewById(R.id.overlay_follow)
         ghostView = findViewById(R.id.overlay_ghost_follow)
         ghostButton = GhostFollowButton(ghostView, app.ghostFollows, { app.tokens.userId }, ::updateButtonLabel)
-        followButton = FollowButton(followView, scope, app.follows, { app.tokens.userId }, {
-            app.tokens.clearLogin()
+        followButton = FollowButton(followView, scope, app.follows, app.tokens, authRequired@{ error ->
+            if (!error.clearLogin(app.tokens)) return@authRequired
             startActivity(android.content.Intent(this, com.purpletv.home.MainActivity::class.java)
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP))
             finish()

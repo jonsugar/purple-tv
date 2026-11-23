@@ -45,7 +45,7 @@ class FollowingPage(
     private val pins: PinStore,
     private val streamPrefs: StreamPreferences,
     private val ghostFollows: GhostFollowStore,
-    private val onAuthRequired: () -> Unit,
+    private val onAuthRequired: (NotLoggedInException) -> Unit,
     private val onTabSelected: (Int) -> Unit = {},
 ) {
     val view: View = LayoutInflater.from(context).inflate(R.layout.page_following, null)
@@ -107,15 +107,17 @@ class FollowingPage(
     private val channelSections: FollowingSections
 
     private val live: Pager<Stream> = Pager(scope, Stream::userId, {
-        Page(helix.followedStreams(account ?: throw NotLoggedInException()), null)
+        val session = helix.sessionId
+        Page(helix.followedStreams(account ?: throw NotLoggedInException(), session), null)
     }, onAuthRequired) { items, failed ->
         liveItems = items
         renderLive()
         if (!failed) liveLoadedAt = SystemClock.elapsedRealtime()
         val requestedAccount = account
+        val session = helix.sessionId
         scope.launch {
             try {
-                val urls = avatars.urls(items.map { it.userId })
+                val urls = avatars.urls(items.map { it.userId }, session)
                 if (account == requestedAccount) {
                     liveAdapter.avatars = urls
                     pinnedLive.avatars = urls
@@ -438,9 +440,10 @@ class FollowingPage(
         val id = account ?: return
         if (channelJob?.isActive == true) return
         if (channels.isEmpty()) channelPage.loading()
+        val session = helix.sessionId
         channelJob = scope.launch {
             try {
-                val followed = helix.allFollowedChannels(id)
+                val followed = helix.allFollowedChannels(id, session)
                 ensureActive()
                 if (id != account) return@launch
                 val existing = channels.associateBy { it.id }
@@ -455,7 +458,7 @@ class FollowingPage(
             } catch (e: IOException) {
                 channelListFailed = true
                 showChannelStatus()
-                if (e is NotLoggedInException) onAuthRequired()
+                if (e is NotLoggedInException) onAuthRequired(e)
             }
         }
     }
@@ -465,6 +468,7 @@ class FollowingPage(
         profilesWanted = maxOf(profilesWanted, position + 40).coerceAtMost(channels.size)
         if (profileJob?.isActive == true || profilesFailed) return
         val id = account
+        val session = helix.sessionId
         profileJob = scope.launch {
             try {
                 while (true) {
@@ -472,7 +476,7 @@ class FollowingPage(
                     val missing = (pinned + regular.take(profilesWanted) + ghostDirectory()).asSequence()
                         .map { it.id }.filter { it !in profileIds }.take(100).toList()
                     if (missing.isEmpty()) break
-                    val profiles = helix.users(missing).associateBy(User::id)
+                    val profiles = helix.users(missing, session).associateBy(User::id)
                     ensureActive()
                     if (account != id) return@launch
                     profileIds.addAll(missing)
@@ -484,7 +488,7 @@ class FollowingPage(
             } catch (e: IOException) {
                 profilesFailed = true
                 showChannelStatus()
-                if (e is NotLoggedInException) onAuthRequired()
+                if (e is NotLoggedInException) onAuthRequired(e)
             }
         }
     }
@@ -497,16 +501,17 @@ class FollowingPage(
     private fun refreshGhostLive() {
         val owner = account ?: return
         if (ghostLiveJob?.isActive == true) return
+        val session = helix.sessionId
         ghostLiveJob = scope.launch {
             try {
-                val streams = helix.streamsByUserIds(ghostFollows.ids(owner))
+                val streams = helix.streamsByUserIds(ghostFollows.ids(owner), session)
                 ensureActive()
                 if (account != owner) return@launch
                 ghostLive = streams
                 ghostLiveLoadedAt = SystemClock.elapsedRealtime()
                 ghostLiveFailed = false
-            } catch (_: NotLoggedInException) {
-                onAuthRequired()
+            } catch (e: NotLoggedInException) {
+                onAuthRequired(e)
                 return@launch
             } catch (_: IOException) {
                 ghostLiveFailed = true
@@ -515,7 +520,7 @@ class FollowingPage(
             renderChannels()
             if (channelsLoaded) showChannelStatus()
             try {
-                val urls = avatars.urls(ghostLive.map(Stream::userId))
+                val urls = avatars.urls(ghostLive.map(Stream::userId), session)
                 if (account == owner) ghostLiveCards.avatars = urls
             } catch (_: IOException) { /* A missing avatar must not hide a stream. */ }
         }
@@ -524,9 +529,10 @@ class FollowingPage(
     private fun refreshChannelLive() {
         val id = account ?: return
         if (liveStatusJob?.isActive == true) return
+        val session = helix.sessionId
         liveStatusJob = scope.launch {
             try {
-                val streams = helix.followedStreams(id).associateBy { it.userId }
+                val streams = helix.followedStreams(id, session).associateBy { it.userId }
                 ensureActive()
                 if (account != id) return@launch
                 channels = channels.map { it.copy(live = streams[it.id]) }
@@ -536,7 +542,7 @@ class FollowingPage(
             } catch (e: IOException) {
                 liveStatusFailed = true
                 showChannelStatus()
-                if (e is NotLoggedInException) onAuthRequired()
+                if (e is NotLoggedInException) onAuthRequired(e)
             }
         }
     }

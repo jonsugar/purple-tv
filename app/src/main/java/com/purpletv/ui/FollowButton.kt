@@ -6,6 +6,8 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import com.purpletv.R
+import com.purpletv.auth.SessionId
+import com.purpletv.auth.TokenStore
 import com.purpletv.twitch.FollowApi
 import com.purpletv.twitch.FollowKind
 import com.purpletv.twitch.NotLoggedInException
@@ -22,8 +24,8 @@ class FollowButton(
     private val view: View,
     private val scope: CoroutineScope,
     private val api: FollowApi,
-    private val account: () -> String?,
-    private val onAuthRequired: () -> Unit,
+    private val tokens: TokenStore,
+    private val onAuthRequired: (NotLoggedInException) -> Unit,
     private val onLabelChanged: () -> Unit = {},
     private val pinButton: PinButton? = null,
     private val onConfirmationChanged: (Boolean) -> Unit = {},
@@ -36,12 +38,14 @@ class FollowButton(
     private var following = false
     private var busy = false
     private var known = false
-    private var boundAccount: String? = null
+    private var boundSession: SessionId? = null
 
     init {
         view.setOnClickListener {
             if (busy || confirmation != null) return@setOnClickListener
+            val (kind, id) = target ?: return@setOnClickListener
             when {
+                !isBoundToCurrentSession() -> bind(kind, id, targetName)
                 !known -> load()
                 following -> confirmUnfollow()
                 else -> writeFollow(follow = true)
@@ -56,12 +60,12 @@ class FollowButton(
 
     fun bind(kind: FollowKind, id: String, name: String) {
         targetName = name
-        if (target == (kind to id) && boundAccount == account() && (busy || confirmation != null)) return
+        if (target == (kind to id) && isBoundToCurrentSession() && (busy || confirmation != null)) return
         generation++
         confirmation?.dismiss()
         job?.cancel()
         target = kind to id
-        boundAccount = account()
+        boundSession = tokens.session.id
         following = false
         known = false
         load()
@@ -72,6 +76,7 @@ class FollowButton(
         confirmation?.dismiss()
         job?.cancel()
         target = null
+        boundSession = null
         following = false
         known = false
         busy = false
@@ -80,27 +85,28 @@ class FollowButton(
 
     private fun load() {
         val (kind, id) = target ?: return
+        val session = boundSession ?: return
         val request = generation
         busy = true
         render()
         job = scope.launch {
             try {
-                val result = api.isFollowing(kind, id)
+                val result = api.isFollowing(kind, id, session)
                 ensureActive()
-                if (request != generation || boundAccount != account()) return@launch
+                if (request != generation || !isBoundToCurrentSession()) return@launch
                 following = result
                 known = true
             } catch (e: IOException) {
-                if (request != generation || boundAccount != account()) return@launch
-                if (e is NotLoggedInException) onAuthRequired()
+                if (request != generation || !isBoundToCurrentSession()) return@launch
+                if (e is NotLoggedInException) onAuthRequired(e)
             } finally {
-                if (request == generation) { busy = false; render() }
+                finishRequest(request)
             }
         }
     }
 
     private fun confirmUnfollow() {
-        if (boundAccount == null || boundAccount != account()) { onAuthRequired(); return }
+        if (!canWrite()) return
         val request = generation
         val dialog = AlertDialog.Builder(view.context, R.style.PurpleDialog)
             .setTitle(view.context.getString(R.string.unfollow_title, targetName))
@@ -122,27 +128,47 @@ class FollowButton(
 
     private fun writeFollow(follow: Boolean) {
         val (kind, id) = target ?: return
-        val owner = boundAccount
-        if (owner == null || owner != account()) { onAuthRequired(); return }
+        val session = boundSession ?: return
+        if (!canWrite()) return
         val request = generation
         busy = true
         render()
         job = scope.launch {
             try {
-                if (follow) api.follow(kind, id)
+                if (follow) api.follow(kind, id, session)
                 // The write may already have reached Twitch when the viewer leaves this screen.
-                else withContext(NonCancellable) { api.unfollow(kind, id, owner) }
+                else withContext(NonCancellable) { api.unfollow(kind, id, session) }
                 ensureActive()
-                if (request != generation || boundAccount != account()) return@launch
+                if (request != generation || !isBoundToCurrentSession()) return@launch
                 following = follow
             } catch (e: IOException) {
-                if (request != generation || boundAccount != account()) return@launch
-                if (e is NotLoggedInException) onAuthRequired()
+                if (request != generation || !isBoundToCurrentSession()) return@launch
+                if (e is NotLoggedInException) onAuthRequired(e)
                 else Toast.makeText(view.context, if (follow) R.string.follow_error else R.string.unfollow_error, Toast.LENGTH_LONG).show()
             } finally {
-                if (request == generation) { busy = false; render() }
+                finishRequest(request)
             }
         }
+    }
+
+    private fun finishRequest(request: Int) {
+        if (request != generation) return
+        busy = false
+        if (!isBoundToCurrentSession()) {
+            known = false
+            following = false
+        }
+        render()
+    }
+
+    private fun isBoundToCurrentSession() = boundSession === tokens.session.id
+
+    private fun canWrite(): Boolean {
+        val session = tokens.session
+        if (boundSession !== session.id) return false
+        if (session.userId != null) return true
+        onAuthRequired(NotLoggedInException(session.id))
+        return false
     }
 
     private fun render() {
@@ -158,7 +184,7 @@ class FollowButton(
         view.alpha = if (busy || target == null) 0.5f else 1f
         (view as? TextView)?.text = label
         (view as? ImageView)?.setImageResource(if (following) R.drawable.ic_followed else R.drawable.ic_following)
-        pinButton?.bind(target, targetName, known && following && boundAccount == account(), busy)
+        pinButton?.bind(target, targetName, known && following && isBoundToCurrentSession(), busy)
         onLabelChanged()
     }
 }

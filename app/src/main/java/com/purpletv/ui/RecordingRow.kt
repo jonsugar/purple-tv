@@ -4,6 +4,7 @@ import android.view.View
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.purpletv.R
+import com.purpletv.twitch.NotLoggedInException
 import com.purpletv.twitch.Page
 import com.purpletv.twitch.Recording
 import kotlinx.coroutines.CoroutineScope
@@ -14,7 +15,7 @@ class RecordingRow(
     scope: CoroutineScope,
     private val emptyText: Int,
     fetch: suspend (String?) -> Page<Recording>,
-    onAuthRequired: () -> Unit,
+    onAuthRequired: (NotLoggedInException) -> Unit,
 ) {
     private val list: CardRow = root.findViewById(R.id.recording_row_list)
     private val status: TextView = root.findViewById(R.id.recording_row_status)

@@ -2,6 +2,7 @@ package com.purpletv.twitch
 
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
+import com.purpletv.auth.signIn
 import com.purpletv.net.TwitchResponseException
 import kotlinx.coroutines.test.runTest
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -63,7 +64,7 @@ class PlaybackApiTest {
 
     @Test
     fun sendsTheLoginTokenWithItsOwnClientId() = runTest {
-        tokens.accessToken = "secret"
+        tokens.signIn("secret")
         enqueueSignedInToken()
         server.enqueue(MockResponse().setBody("#EXTM3U"))
 
@@ -77,7 +78,7 @@ class PlaybackApiTest {
 
     @Test
     fun asksLikeTheOfficialTvAppWhenSignedIn() = runTest {
-        tokens.accessToken = "secret"
+        tokens.signIn("secret")
         enqueueSignedInToken()
         server.enqueue(MockResponse().setBody("#EXTM3U"))
 
@@ -92,7 +93,7 @@ class PlaybackApiTest {
 
     @Test
     fun signedInOfflineChannelIsOffline() = runTest {
-        tokens.accessToken = "secret"
+        tokens.signIn("secret")
         server.enqueue(MockResponse().setBody("""{"data":{"user":{"stream":null}}}"""))
 
         try {
@@ -105,8 +106,7 @@ class PlaybackApiTest {
 
     @Test
     fun refreshesAnExpiredTokenOnce() = runTest {
-        tokens.accessToken = "old"
-        tokens.refreshToken = "r1"
+        tokens.signIn("old", "r1")
         server.enqueue(MockResponse().setResponseCode(401))
         server.enqueue(MockResponse().setBody("""{"access_token":"new","refresh_token":"r2"}"""))
         enqueueSignedInToken()
@@ -122,8 +122,7 @@ class PlaybackApiTest {
 
     @Test
     fun playsAnonymouslyWhenTwitchRefusesTheToken() = runTest {
-        tokens.accessToken = "old"
-        tokens.refreshToken = "r1"
+        tokens.signIn("old", "r1")
         server.enqueue(MockResponse().setResponseCode(401))
         server.enqueue(MockResponse().setResponseCode(400).setBody("""{"status":400,"message":"Invalid refresh token"}"""))
         enqueueToken()
@@ -185,8 +184,7 @@ class PlaybackApiTest {
 
     @Test
     fun invalidSignedInResponsesAreNeitherOfflineNorAuthRefusals() = runTest {
-        tokens.accessToken = "secret"
-        tokens.refreshToken = "refresh"
+        tokens.signIn("secret", "refresh")
         val invalidBodies = listOf(
             """{"data":{"user":null}}""",
             """{"data":{"user":{}}}""",

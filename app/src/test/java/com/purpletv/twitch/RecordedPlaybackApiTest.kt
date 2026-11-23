@@ -2,6 +2,7 @@ package com.purpletv.twitch
 
 import com.purpletv.auth.DeviceAuth
 import com.purpletv.auth.InMemoryTokenStore
+import com.purpletv.auth.signIn
 import kotlinx.coroutines.test.runTest
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
@@ -18,7 +19,7 @@ class RecordedPlaybackApiTest {
     private lateinit var api: RecordedPlaybackApi
     @Before fun setup() {
         server.start()
-        val tokens = InMemoryTokenStore().apply { accessToken = "signed-in" }
+        val tokens = InMemoryTokenStore().apply { signIn("signed-in") }
         val http = OkHttpClient()
         val auth = DeviceAuth(http, "client", "user:read:follows", tokens)
         api = RecordedPlaybackApi(http, TwitchGraphQl(http, auth, server.url("/gql").toString()), server.url("/").toString())

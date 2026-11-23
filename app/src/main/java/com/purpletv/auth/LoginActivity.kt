@@ -59,6 +59,10 @@ class LoginActivity : Activity() {
                 setResult(RESULT_OK)
                 finish()
                 return@launch
+            } catch (_: SessionChangedException) {
+                if (PurpleApp.instance.tokens.accessToken != null) setResult(RESULT_OK)
+                finish()
+                return@launch
             } catch (e: DeviceCodeExpiredException) {
                 // Next round asks for a fresh code.
             } catch (e: IOException) {
